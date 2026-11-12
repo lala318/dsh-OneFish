@@ -1,0 +1,43 @@
+{
+  "name": "onefish-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "OneFish Core：记忆、人格、统一会话；QQ/B站/桌宠作为可选组件。",
+  "main": "./lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "files": [
+    "lib",
+    "locale",
+    "presets",
+    "scripts",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node test/core.test.mjs && node test/mcp.test.mjs",
+    "setup": "node scripts/setup-dsh.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "js-yaml": "4.3.2",
+    "zod": "4.6.7"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": [
+        "./cordis.patch.yml",
+        "./presets/onefish-core.patch.yml"
+      ]
+    },
+    "client": {
+      "platform": "web",
+      "inject": []
+    }
+  },
+  "license": "MIT"
+}
