@@ -22,6 +22,7 @@ export function createSessionService({
   paths,
   adapter = null,
   archive = null,
+  bootPack = null,
   config = DEFAULT_CONFIG,
   logger = () => {},
   now = () => Date.now(),
@@ -57,6 +58,7 @@ export function createSessionService({
       sessionId: state.active?.sessionId || '',
       workspaceId: state.active?.workspaceId || '',
       workspaceTitle: state.active?.workspaceTitle || '',
+      bootPackAt: state.active?.bootPackAt || 0,
       currentDay: activeDay,
       recent: state.recent.length,
       pending: state.recent.filter((item) => item.status === 'pending' || item.status === 'failed').length,
@@ -77,6 +79,7 @@ export function createSessionService({
         titlePrefix: options.titlePrefix,
         workspaceTitle: options.workspaceTitle,
         workspacePath: options.workspacePath,
+        bootMaxChars: options.bootMaxChars,
         autoConsolidate: options.autoConsolidate,
       },
     };
@@ -88,10 +91,11 @@ export function createSessionService({
     const state = index.read();
     if (!state.active || state.active.sessionId !== id) return null;
     const type = String(event?.type || event?.event?.type || '').trim();
+    const isMessage = type === 'user/message' || type === 'assistant/message';
     state.active = {
       ...state.active,
       lastActivityAt: now(),
-      eventCount: Number(state.active.eventCount || 0) + (type && type !== 'heartbeat' ? 1 : 0),
+      eventCount: Number(state.active.eventCount || 0) + (isMessage ? 1 : 0),
       lastEventType: type || state.active.lastEventType || '',
     };
     index.write(state);
@@ -111,6 +115,19 @@ export function createSessionService({
     }
   }
 
+  async function applyBootPack(entry) {
+    if (!bootPack || !adapter || typeof adapter.injectContext !== 'function') return entry;
+    try {
+      const text = bootPack.build({ day: entry.day, workspace: entry });
+      await adapter.injectContext(entry.sessionId, text);
+      logger(`开机包已注入：${entry.day} / ${entry.sessionId}（${text.length} 字）`);
+      return { ...entry, bootPackAt: now(), bootPackChars: text.length };
+    } catch (error) {
+      logger(`开机包注入失败 ${entry.sessionId}：${error?.message ?? error}`);
+      return entry;
+    }
+  }
+
   async function createDaily(day, workspace = null) {
     if (!adapter) throw new Error('DSH session adapter is not available');
     const title = `${options.titlePrefix} ${day}`;
@@ -123,7 +140,7 @@ export function createSessionService({
     });
     const sessionId = String(created?.sessionId || '').trim();
     if (!sessionId) throw new Error('DSH session.create returned no sessionId');
-    return {
+    const entry = await applyBootPack({
       day,
       sessionId,
       preset: String(created?.preset || options.preset),
@@ -134,7 +151,10 @@ export function createSessionService({
       lastActivityAt: now(),
       eventCount: 0,
       status: 'active',
-    };
+      bootPackAt: 0,
+      bootPackChars: 0,
+    });
+    return entry;
   }
 
   function sameWorkspace(active, workspace) {
@@ -161,7 +181,15 @@ export function createSessionService({
       const workspace = await ensureWorkspace();
       const state = index.read();
       if (state.active?.day === day && sameWorkspace(state.active, workspace)) {
-        return { ...state.active, created: false, reused: true };
+        let active = state.active;
+        if (!active.bootPackAt) {
+          const injected = await applyBootPack(active);
+          if (injected.bootPackAt) active = index.updateActive({
+            bootPackAt: injected.bootPackAt,
+            bootPackChars: injected.bootPackChars,
+          }) || injected;
+        }
+        return { ...active, created: false, reused: true };
       }
       const previous = state.active;
 
@@ -317,6 +345,7 @@ export function createSessionService({
     seal,
     archiveDay,
     consolidateDay,
+    applyBootPack,
     runPending,
     retire,
     noteActivity,

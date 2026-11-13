@@ -39,6 +39,8 @@ function normalizeEntry(entry) {
     workspaceId: String(entry.workspaceId || ''),
     workspaceTitle: String(entry.workspaceTitle || ''),
     workspacePath: String(entry.workspacePath || ''),
+    bootPackAt: Number(entry.bootPackAt || 0),
+    bootPackChars: Number(entry.bootPackChars || 0),
     createdAt: Number(entry.createdAt || 0),
     sealedAt: Number(entry.sealedAt || 0),
     lastActivityAt: Number(entry.lastActivityAt || 0),
@@ -114,6 +116,14 @@ export function createSessionIndexStore({ paths }) {
     return state.recent[index];
   }
 
+  function updateActive(patch = {}) {
+    const state = read();
+    if (!state.active) return null;
+    state.active = normalizeEntry({ ...state.active, ...patch });
+    write(state);
+    return state.active;
+  }
+
   function find(day) {
     const state = read();
     if (state.active?.day === day) return state.active;
@@ -126,5 +136,5 @@ export function createSessionIndexStore({ paths }) {
     write(state);
   }
 
-  return { read, write, setActive, sealActive, updateRecent, find, removeRecent };
+  return { read, write, setActive, sealActive, updateActive, updateRecent, find, removeRecent };
 }

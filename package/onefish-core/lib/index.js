@@ -28,9 +28,14 @@ export function apply(ctx) {
     try {
       workspaceRegistry = ctx.get?.('workspaceRegistry') ?? ctx.workspaceRegistry ?? null;
     } catch {}
+    let sessions = null;
+    try {
+      sessions = ctx.get?.('sessions') ?? ctx.sessions ?? null;
+    } catch {}
     sessionAdapter = createDshSessionAdapter({
       sessionController: ctx.sessionController,
       workspaceRegistry,
+      sessions,
       logger: (...args) => console.log('[onefish-core]', ...args),
     });
   } catch (error) {
@@ -188,6 +193,13 @@ export function apply(ctx) {
       const entry = body?.id ? core.memory.remove(String(body.id)) : null;
       if (!entry) { json(res, 404, { ok: false, error: '没有找到记忆' }); return; }
       json(res, 200, { ok: true, entry });
+      return;
+    }
+    if (pathname === `${API_PREFIX}/session/bootpack` && req.method === 'GET') {
+      const active = core.session.current();
+      if (!active) { json(res, 404, { ok: false, error: '今天还没有日会话' }); return; }
+      const text = core.bootPack.build({ day: active.day, workspace: active });
+      json(res, 200, { ok: true, day: active.day, sessionId: active.sessionId, workspaceTitle: active.workspaceTitle, injectedAt: active.bootPackAt, chars: text.length, text });
       return;
     }
     if (pathname === `${API_PREFIX}/sessions` && req.method === 'GET') {

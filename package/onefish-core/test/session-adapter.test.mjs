@@ -5,7 +5,17 @@
 import assert from 'node:assert/strict';
 import { createDshSessionAdapter } from '../lib/dsh/session-adapter.js';
 
-const calls = { create: [], rename: [], events: [], archive: [], workspaceCreate: [] };
+const calls = { create: [], rename: [], events: [], archive: [], workspaceCreate: [], append: [] };
+const sessions = {
+  get(sessionId) {
+    return {
+      append(type, data, opts) {
+        calls.append.push({ sessionId, type, data, opts });
+        return { seq: 42 };
+      },
+    };
+  },
+};
 const controller = {
   async create(request) {
     calls.create.push(request);
@@ -60,6 +70,7 @@ const workspaceRegistry = {
 const adapter = createDshSessionAdapter({
   sessionController: controller,
   workspaceRegistry,
+  sessions,
   historyPageMessages: 2,
   historyMaxPages: 5,
 });
@@ -92,5 +103,13 @@ assert.equal(calls.events[0].address.sessionId, 'session-adapter-1');
 
 await adapter.archive('session-adapter-1');
 assert.deepEqual(calls.archive, [{ sessionId: 'session-adapter-1', options: { stopActivity: true } }]);
+
+const injected = await adapter.injectContext('session-adapter-1', '【OneFish 开机包】');
+assert.equal(injected.seq, 42);
+assert.equal(calls.append.length, 1);
+assert.equal(calls.append[0].type, 'developer/message');
+assert.equal(calls.append[0].data.message.role, 'developer');
+assert.equal(calls.append[0].data.message.content[0].text, '【OneFish 开机包】');
+assert.deepEqual(calls.append[0].opts, { surfaceOp: 'append' });
 
 console.log('✅ DSH 会话适配层测试通过');

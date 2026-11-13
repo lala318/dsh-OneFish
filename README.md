@@ -23,6 +23,7 @@ OneFish/
 - [ADR-0001：Core is DSH-first](docs/adr/0001-core-is-dsh-first.md)
 - [ADR-0002：会话运行时归 DSH，生命周期归 Core](docs/adr/0002-session-ownership.md)
 - [ADR-0003：全量记忆与 memory-space 分层，日终整理](docs/adr/0003-memory-layers-and-consolidation.md)
+- [ADR-0004：日会话创建时注入开机包](docs/adr/0004-boot-pack.md)
 
 ## 安装 / 注册
 
@@ -48,6 +49,8 @@ npm run setup
 - **消息历史、上下文、会话 UI 归 DSH**；
 - Core 只负责：每天新建日会话、封存旧日会话、把旧会话整理进全量档案；
 - 日会话默认放在 DSH 工作区 `onefish`（路径 `~/.dsh/OneFish`）；
+- 创建日会话时自动注入**开机包**：core 全量记忆、人格卡、active 记忆、昨日摘要/近期档案、DSH 使用说明；
+- 开机包通过 `developer/message` 注入，不产生 user turn；设置页可预览；
 - 逻辑日默认 **04:00**；
 - “回收”是归档/隐藏，不删除历史。
 

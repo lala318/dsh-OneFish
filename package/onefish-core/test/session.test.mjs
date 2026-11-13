@@ -16,6 +16,7 @@ const adapter = {
   createCount: 0,
   historyCalls: 0,
   archived: [],
+  injected: [],
   workspaceCalls: 0,
   async ensureWorkspace({ path: workspacePath, title }) {
     this.workspaceCalls += 1;
@@ -26,6 +27,10 @@ const adapter = {
     this.createCount += 1;
     this.lastWorkspaceId = workspaceId;
     return { sessionId: `session-test-${this.createCount}`, preset: preset || 'onefish-core', day };
+  },
+  async injectContext(sessionId, text) {
+    this.injected.push({ sessionId, text });
+    return { seq: this.injected.length };
   },
   async history() {
     this.historyCalls += 1;
@@ -53,6 +58,9 @@ try {
     config: { autoConsolidate: false, consolidateOnBootstrap: false, rolloverHour: 4, workspacePath: temp, workspaceTitle: 'onefish' },
   });
 
+  core.memory.add({ text: '我是测试核心', tier: 'core', kind: 'fact' });
+  core.memory.add({ text: '近期偏好是简洁', tier: 'active', kind: 'preference' });
+
   const first = await core.session.ensureToday();
   assert.equal(first.day, '2026-11-13');
   assert.equal(first.sessionId, 'session-test-1');
@@ -60,6 +68,12 @@ try {
   assert.equal(first.workspaceTitle, 'onefish');
   assert.equal(adapter.lastWorkspaceId, 'workspace-onefish');
   assert.equal(adapter.workspaceCalls, 1);
+  assert.ok(first.bootPackAt > 0, '新会话应注入开机包');
+  assert.equal(adapter.injected.length, 1);
+  assert.match(adapter.injected[0].text, /【OneFish 开机包】2026-11-13/);
+  assert.match(adapter.injected[0].text, /我是测试核心/);
+  assert.match(adapter.injected[0].text, /近期偏好是简洁/);
+  assert.match(adapter.injected[0].text, /【人格卡】/);
   assert.equal(first.created, true);
   assert.equal(core.session.stats().active, true);
   assert.equal(core.session.current().status, 'active');
@@ -69,6 +83,7 @@ try {
   const same = await core.session.ensureToday();
   assert.equal(same.reused, true);
   assert.equal(adapter.createCount, 1);
+  assert.equal(adapter.injected.length, 1, '同一天不应重复注入开机包');
 
   core.session.noteActivity('session-test-1', { type: 'user/message' });
   assert.equal(core.session.current().eventCount, 1);
@@ -78,6 +93,9 @@ try {
   const second = await core.session.ensureToday();
   assert.equal(second.day, '2026-11-14');
   assert.equal(second.sessionId, 'session-test-2');
+  assert.ok(second.bootPackAt > 0, '新一天也应注入开机包');
+  assert.equal(adapter.injected.length, 2);
+  assert.match(adapter.injected[1].text, /【OneFish 开机包】2026-11-14/);
   assert.equal(adapter.createCount, 2);
   assert.equal(core.session.stats().pending, 1);
   assert.equal(core.session.status().recent.find((item) => item.day === '2026-11-13').status, 'pending');

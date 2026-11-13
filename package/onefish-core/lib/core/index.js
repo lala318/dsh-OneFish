@@ -15,6 +15,7 @@ import { createPersonaService } from './persona.js';
 import { createMemoryService } from './memory.js';
 import { createSessionService } from './session.js';
 import { createArchiveService } from './archive.js';
+import { createBootPackService } from './boot-pack.js';
 import { DEFAULT_CONFIG, loadConfig } from './config.js';
 
 export function createCore({
@@ -33,10 +34,12 @@ export function createCore({
   const persona = createPersonaService({ paths, logger });
   const memory = createMemoryService({ paths, persona, logger });
   const archive = createArchiveService({ paths, logger });
+  const bootPack = createBootPackService({ persona, memory, archive, config, now });
   const session = createSessionService({
     paths,
     adapter: sessionAdapter,
     archive,
+    bootPack,
     config,
     logger,
     now,
@@ -63,7 +66,7 @@ export function createCore({
     try { logger(line); } catch {}
   }
 
-  return { paths, config, persona, memory, session, archive, health, log };
+  return { paths, config, persona, memory, session, archive, bootPack, health, log };
 }
 
 export { createCorePaths, resolveCoreHome } from './paths.js';

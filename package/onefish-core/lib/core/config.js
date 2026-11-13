@@ -14,6 +14,9 @@ export const DEFAULT_CONFIG = Object.freeze({
   workspacePath: '',
   autoConsolidate: true,
   consolidateOnBootstrap: true,
+  bootMaxChars: 5000,
+  personaMaxChars: 2000,
+  digestMaxChars: 1200,
   historyPageMessages: 200,
   historyMaxPages: 50,
 });
@@ -46,6 +49,9 @@ export function loadConfig(file) {
     titlePrefix: typeof raw.titlePrefix === 'string' && raw.titlePrefix.trim() ? raw.titlePrefix.trim() : DEFAULT_CONFIG.titlePrefix,
     workspaceTitle: typeof raw.workspaceTitle === 'string' && raw.workspaceTitle.trim() ? raw.workspaceTitle.trim() : DEFAULT_CONFIG.workspaceTitle,
     workspacePath: typeof raw.workspacePath === 'string' && raw.workspacePath.trim() ? raw.workspacePath.trim() : DEFAULT_CONFIG.workspacePath,
+    bootMaxChars: clampInt(raw.bootMaxChars, DEFAULT_CONFIG.bootMaxChars, 1000, 12000),
+    personaMaxChars: clampInt(raw.personaMaxChars, DEFAULT_CONFIG.personaMaxChars, 200, 6000),
+    digestMaxChars: clampInt(raw.digestMaxChars, DEFAULT_CONFIG.digestMaxChars, 200, 4000),
     autoConsolidate: raw.autoConsolidate !== false,
     consolidateOnBootstrap: raw.consolidateOnBootstrap !== false,
   };

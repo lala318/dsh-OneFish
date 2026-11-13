@@ -6,6 +6,7 @@
 export function createDshSessionAdapter({
   sessionController,
   workspaceRegistry = null,
+  sessions = null,
   logger = () => {},
   historyPageMessages = 200,
   historyMaxPages = 50,
@@ -86,5 +87,24 @@ export function createDshSessionAdapter({
     logger(`DSH 会话已归档：${sessionId}`);
   }
 
-  return { ensureWorkspace, createDaily, history, archive };
+  /** 把开机包作为 developer/message 注入日会话；不产生 user turn。 */
+  async function injectContext(sessionId, text) {
+    if (!text || !String(text).trim()) throw new Error('boot pack text is empty');
+    if (!sessions || typeof sessions.get !== 'function') throw new Error('sessions service is not available');
+    const session = sessions.get(sessionId);
+    if (!session || typeof session.append !== 'function') throw new Error(`session not found: ${sessionId}`);
+    const event = session.append(
+      'developer/message',
+      {
+        message: {
+          role: 'developer',
+          content: [{ type: 'text', text: String(text) }],
+        },
+      },
+      { surfaceOp: 'append' },
+    );
+    return { seq: event?.seq ?? null };
+  }
+
+  return { ensureWorkspace, createDaily, history, archive, injectContext };
 }

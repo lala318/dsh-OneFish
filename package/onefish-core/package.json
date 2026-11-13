@@ -19,7 +19,7 @@
     "README.md"
   ],
   "scripts": {
-    "test": "node test/core.test.mjs && node test/session.test.mjs && node test/session-adapter.test.mjs && node test/mcp.test.mjs",
+    "test": "node test/core.test.mjs && node test/session.test.mjs && node test/session-adapter.test.mjs && node test/boot-pack.test.mjs && node test/mcp.test.mjs",
     "setup": "node scripts/setup-dsh.mjs"
   },
   "dependencies": {

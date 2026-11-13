@@ -35,6 +35,13 @@ export function sameDay(a, b, options = {}) {
   return dayKeyOf(a, options) === dayKeyOf(b, options);
 }
 
+/** 逻辑日前后移动（返回 YYYY-MM-DD）。 */
+export function shiftDay(dayKey, offset, options = {}) {
+  const d = new Date(dayStart(dayKey, options));
+  d.setDate(d.getDate() + Number(offset || 0));
+  return dayKeyOf(d.getTime(), options);
+}
+
 /** 展示用：2026-11-13 → 2026-11-13。 */
 export function normalizeDayKey(dayKey) {
   const text = String(dayKey || '').trim();
