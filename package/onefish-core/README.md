@@ -17,14 +17,14 @@ QQ、B站、桌宠、语音、桥接、SnowLuma 都不参与；它们后续作�
 ```text
 lib/core/
 ├─ domain/        # 纯规则：日切 / 摘要 / 配置归一化
-├─ application/   # 用例：人格 / 记忆 / 日会话 / 开机包
+├─ application/   # 用例：人格 / 记忆 / 日会话 / 开机包（不碰 fs）
 ├─ adapters/
-│  ├─ fs/         # 文件存储
+│  ├─ fs/         # 文件存储 + persona/memory store
 │  └─ dsh/        # DSH session / workspace
 └─ index.js       # 组合根 / 公开出口
 ```
 
-组件只应使用 `lib/core/index.js` 或后续公开 API，不要直接 import domain/application/adapters。
+组件只应使用 `.`（`lib/core/index.js`）或后续公开 API，不要直接 import domain/application/adapters。
 
 ## 安装
 

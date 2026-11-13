@@ -56,9 +56,9 @@ lib/core/
 └─ index.js
 ```
 
-> 实现状态：目录分层（阶段 A）已完成。`domain` 不读文件、不依赖 DSH；
-> `application/persona.js` / `memory.js` 目前仍有文件 IO，阶段 B 再把存储下沉到
-> `adapters/fs`，让 application 只依赖 domain + ports。
+> 实现状态：阶段 A/B 已完成。`domain` 不读文件、不依赖 DSH；
+> `application` 不 import `node:fs` / `node:path` / `adapters`，只接收注入的 store 和 adapter；
+> 文件读写集中在 `adapters/fs`，DSH 会话/工作区集中在 `adapters/dsh`。
 
 ## 后果
 

@@ -9,7 +9,6 @@
  * 不保存消息正文，不组装上下文。
  */
 import { dayKeyOf, normalizeDayKey } from '../domain/day.js';
-import { createSessionIndexStore } from '../adapters/fs/session-index.js';
 import { DEFAULT_CONFIG } from '../domain/config.js';
 
 function safeLimit(value, fallback = 20, max = 100) {
@@ -19,7 +18,7 @@ function safeLimit(value, fallback = 20, max = 100) {
 }
 
 export function createSessionService({
-  paths,
+  sessionIndex,
   adapter = null,
   archive = null,
   bootPack = null,
@@ -27,7 +26,8 @@ export function createSessionService({
   logger = () => {},
   now = () => Date.now(),
 } = {}) {
-  const index = createSessionIndexStore({ paths });
+  if (!sessionIndex) throw new Error('session index store is required');
+  const index = sessionIndex;
   const options = { ...DEFAULT_CONFIG, ...config };
   let ensureInflight = null;
   const consolidateInflight = new Map();

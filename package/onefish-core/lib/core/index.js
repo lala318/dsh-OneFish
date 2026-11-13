@@ -11,6 +11,9 @@
  */
 import fs from 'node:fs';
 import { createCorePaths, ensureCoreDirs } from './adapters/fs/paths.js';
+import { createPersonaStore } from './adapters/fs/persona-store.js';
+import { createMemoryStore } from './adapters/fs/memory-store.js';
+import { createSessionIndexStore } from './adapters/fs/session-index.js';
 import { createPersonaService } from './application/persona.js';
 import { createMemoryService } from './application/memory.js';
 import { createSessionService } from './application/session.js';
@@ -32,12 +35,16 @@ export function createCore({
 
   const config = { ...DEFAULT_CONFIG, ...loadConfig(paths.configFile), ...configOverride };
   if (!config.workspacePath) config.workspacePath = paths.workspacePath;
-  const persona = createPersonaService({ paths, logger });
-  const memory = createMemoryService({ paths, persona, logger });
+  const personaStore = createPersonaStore({ paths });
+  const memoryStore = createMemoryStore({ paths, logger });
+  const sessionIndex = createSessionIndexStore({ paths });
+
+  const persona = createPersonaService({ store: personaStore, logger });
+  const memory = createMemoryService({ store: memoryStore, persona, logger });
   const archive = createArchiveService({ paths, logger });
   const bootPack = createBootPackService({ persona, memory, archive, config, now });
   const session = createSessionService({
-    paths,
+    sessionIndex,
     adapter: sessionAdapter,
     archive,
     bootPack,

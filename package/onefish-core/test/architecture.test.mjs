@@ -29,6 +29,16 @@ for (const name of domainFiles) {
   assert.doesNotMatch(source, /@deepseek-ai|mcp__|\.\.\/adapters/, `${name} 不应依赖 DSH/MCP/adapters`);
 }
 
+const applicationFiles = fs.readdirSync(application).filter((name) => name.endsWith('.js'));
+assert.ok(applicationFiles.length >= 4);
+for (const name of applicationFiles) {
+  const source = fs.readFileSync(path.join(application, name), 'utf8');
+  assert.doesNotMatch(source, /from ['"]node:fs['"]/, `${name} 不应 import node:fs`);
+  assert.doesNotMatch(source, /from ['"]node:path['"]/, `${name} 不应 import node:path`);
+  assert.doesNotMatch(source, /from ['"]\.\.\/adapters\//, `${name} 不应直接 import adapters`);
+  assert.doesNotMatch(source, /@deepseek-ai/, `${name} 不应依赖 DSH`);
+}
+
 const host = fs.readFileSync(path.join(root, 'lib', 'index.js'), 'utf8');
 assert.match(host, /from '\.\/core\/adapters\/dsh\/session-adapter\.js'/);
 assert.match(host, /from '\.\/core\/index\.js'/);

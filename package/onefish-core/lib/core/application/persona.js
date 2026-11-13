@@ -1,64 +1,18 @@
 /**
- * 人格服务：读取/切换/编辑当前角色的人格卡。
+ * 人格用例：读取/编辑当前角色的人格卡。
  *
- * MVP 复用现有角色包目录：
- *   characters/<id>/character.json
- *   characters/<id>/persona.md
- *   characters/current.json
+ * 文件读写由 adapters/fs/persona-store 注入；这里只做规则和回退。
  * 没有角色系统时：只读 core 自己的 core/persona.md，或使用内置中性人格；
  * 不自动读取旧 SurfCore 角色包 / 仓库 roles/，避免测试污染线上数据。
  */
-import fs from 'node:fs';
-import path from 'node:path';
-
 const MAX_PROMPT_CHARS = 6000;
+const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$/;
 
-function readJson(file, fallback = null) {
-  try {
-    let text = fs.readFileSync(file, 'utf8');
-    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
-    return JSON.parse(text);
-  } catch {
-    return fallback;
+function fallbackPersona(store) {
+  const direct = store.readFallback();
+  if (String(direct.text || '').trim()) {
+    return { text: direct.text, source: direct.source, name: 'OneFish' };
   }
-}
-
-function readText(file) {
-  try {
-    let text = fs.readFileSync(file, 'utf8');
-    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
-    return text;
-  } catch {
-    return '';
-  }
-}
-
-function writeTextAtomic(file, text) {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
-  fs.writeFileSync(tmp, text, 'utf8');
-  fs.renameSync(tmp, file);
-}
-
-function safeId(value) {
-  return /^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$/.test(String(value || ''));
-}
-
-function readCurrentId(paths) {
-  const raw = readJson(paths.currentCharacterFile, null);
-  if (!raw || !safeId(raw.id)) return '';
-  if (!fs.existsSync(path.join(paths.charactersDir, raw.id))) return '';
-  return String(raw.id);
-}
-
-function readManifest(paths, id) {
-  return readJson(path.join(paths.charactersDir, id, 'character.json'), null);
-}
-
-function fallbackPersona(paths) {
-  const direct = readText(paths.fallbackPersona);
-  if (direct.trim()) return { text: direct, source: paths.fallbackPersona, name: 'OneFish' };
-  // Core 测试/冷启动不继承旧角色包，也不读仓库 roles/，避免和线上数据互相污染。
   return {
     text: '# OneFish\n\n你是一个有长期记忆的助手。先理解主人要什么，再给结论。',
     source: '(built-in)',
@@ -66,37 +20,39 @@ function fallbackPersona(paths) {
   };
 }
 
-export function createPersonaService({ paths, logger = () => {} }) {
+export function createPersonaService({ store, logger = () => {} } = {}) {
+  if (!store) throw new Error('persona store is required');
+
   function current() {
-    const id = readCurrentId(paths);
-    if (!id) return null;
-    const dir = path.join(paths.charactersDir, id);
-    const manifest = readManifest(paths, id) || {};
-    const personaFile = path.join(dir, 'persona.md');
+    const id = store.currentId();
+    if (!id || !SAFE_ID.test(id)) return null;
+    const rec = store.getCharacter(id);
+    if (!rec) return null;
+    const manifest = rec.manifest || {};
     return {
       id,
       name: String(manifest.name || manifest.personaMeta?.name || id),
-      personaFile,
+      personaFile: rec.personaFile,
       manifest,
-      dir,
+      dir: rec.dir,
     };
   }
 
   function get() {
     const cur = current();
     if (cur) {
-      const text = readText(cur.personaFile);
-      if (text.trim()) {
+      const text = store.readPersona(cur.personaFile);
+      if (String(text).trim()) {
         return {
           id: cur.id,
           name: cur.name,
           text,
           source: cur.personaFile,
-          updatedAt: (() => { try { return fs.statSync(cur.personaFile).mtimeMs; } catch { return 0; } })(),
+          updatedAt: store.statMtime(cur.personaFile),
         };
       }
     }
-    const fallback = fallbackPersona(paths);
+    const fallback = fallbackPersona(store);
     return {
       id: '',
       name: fallback.name,
@@ -107,21 +63,16 @@ export function createPersonaService({ paths, logger = () => {} }) {
   }
 
   function list() {
-    const rows = [];
-    try {
-      for (const name of fs.readdirSync(paths.charactersDir)) {
-        const dir = path.join(paths.charactersDir, name);
-        const personaFile = path.join(dir, 'persona.md');
-        if (!fs.existsSync(personaFile)) continue;
-        const manifest = readJson(path.join(dir, 'character.json'), {}) || {};
-        rows.push({
-          id: name,
-          name: String(manifest.name || manifest.personaMeta?.name || name),
-          updatedAt: (() => { try { return fs.statSync(personaFile).mtimeMs; } catch { return 0; } })(),
-        });
-      }
-    } catch {}
-    return rows.sort((a, b) => b.updatedAt - a.updatedAt);
+    return store.listCharacters()
+      .map((row) => {
+        const manifest = row.manifest || {};
+        return {
+          id: row.id,
+          name: String(manifest.name || manifest.personaMeta?.name || row.id),
+          updatedAt: Number(row.updatedAt || 0),
+        };
+      })
+      .sort((a, b) => b.updatedAt - a.updatedAt);
   }
 
   function update(text) {
@@ -129,10 +80,10 @@ export function createPersonaService({ paths, logger = () => {} }) {
     if (!clean) throw new Error('人格卡不能为空');
     const cur = current();
     if (cur) {
-      writeTextAtomic(cur.personaFile, `${clean}\n`);
+      store.writePersona(cur.personaFile, `${clean}\n`);
       return get();
     }
-    writeTextAtomic(paths.fallbackPersona, `${clean}\n`);
+    store.writeFallback(`${clean}\n`);
     return get();
   }
 

@@ -1,59 +1,25 @@
 /**
- * 记忆服务：复用现有 memory-space（core / active / knowledge）。
+ * 记忆用例：memory-space（core / active / knowledge）的领域门面。
  *
- * 数据位置保持兼容：
- *   characters/<id>/memory-v2/space/entries.jsonl  （角色包）
- *   memory-v2/space/entries.jsonl                 （无角色时 Core 独立根）
- *   characters/<id>/memory/space/entries.jsonl    （仅历史布局回退）
- *
- * 只做薄封装，不重写格式；后续再把实现迁进 core。
+ * 存储位置和文件布局由 adapters/fs/memory-store 负责；这里只做规则和排序。
  */
-import fs from 'node:fs';
-import path from 'node:path';
-import { createMemorySpace } from '../adapters/fs/memory-space.js';
-
-function exists(p) {
-  try { return fs.existsSync(p); } catch { return false; }
-}
-
 function safeLimit(value, fallback = 20, max = 100) {
   const n = Number(value);
   if (!Number.isFinite(n) || n <= 0) return fallback;
   return Math.min(max, Math.round(n));
 }
 
-export function createMemoryService({ paths, persona, logger = () => {} }) {
-  let cached = null;
-  let cachedKey = '';
+export function createMemoryService({ store, persona, logger = () => {} } = {}) {
+  if (!store) throw new Error('memory store is required');
 
   function resolveDirs() {
     const cur = persona?.current?.();
-    const base = cur ? path.join(paths.charactersDir, cur.id) : paths.home;
-    const memoryDir = path.join(base, 'memory');
-    const v2Space = path.join(base, 'memory-v2', 'space');
-    const legacySpace = path.join(memoryDir, 'space');
-    return {
-      characterId: cur?.id || '',
-      base,
-      memoryDir,
-      // 新数据统一写 memory-v2/space；只有已有角色包且历史布局没有 v2 时才回退旧 space。
-      spaceDir: cur && !exists(v2Space) ? legacySpace : v2Space,
-      kbFile: path.join(memoryDir, 'kb', 'entries.jsonl'),
-    };
+    return store.describe(cur?.id || '');
   }
 
   function space() {
-    const dirs = resolveDirs();
-    const key = `${dirs.memoryDir}|${dirs.spaceDir}`;
-    if (cached && cachedKey === key) return cached;
-    cached = createMemorySpace({
-      memoryDir: dirs.memoryDir,
-      spaceDir: dirs.spaceDir,
-      kbFile: dirs.kbFile,
-      log: (...args) => logger('[memory]', ...args),
-    });
-    cachedKey = key;
-    return cached;
+    const cur = persona?.current?.();
+    return store.getSpace(cur?.id || '').space;
   }
 
   function search(query = '', { tier = '', k = 8 } = {}) {
@@ -82,13 +48,12 @@ export function createMemoryService({ paths, persona, logger = () => {} }) {
 
   function add(input = {}) {
     const tier = input.tier === 'core' || input.tier === 'knowledge' ? input.tier : 'active';
-    const entry = space().add({
+    return space().add({
       ...input,
       tier,
       importance: tier === 'core' ? 5 : input.importance,
       by: input.by === 'owner' ? 'owner' : 'agent',
     });
-    return entry;
   }
 
   function update(id, patch = {}) {
