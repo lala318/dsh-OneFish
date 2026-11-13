@@ -127,10 +127,10 @@ window.__ModuleLoader__.load({
         return h("div", null,
           h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: "10px" } },
             h("div", { style: card }, h("div", { style: { fontWeight: 600, marginBottom: "6px" } }, "核心"), row("数据目录", overview.home), row("人格", overview.persona?.name), row("人格字数", overview.persona?.chars), row("记忆", `${overview.memory?.total || 0} 条`)),
-            h("div", { style: card }, h("div", { style: { fontWeight: 600, marginBottom: "6px" } }, "会话"), row("会话数", overview.session?.conversations || 0), row("消息事件", overview.session?.messages || 0), row("最近会话", overview.currentSession?.key || "—")),
+            h("div", { style: card }, h("div", { style: { fontWeight: 600, marginBottom: "6px" } }, "会话"), row("今日", overview.session?.currentDay || "—"), row("状态", overview.session?.active ? "active" : "未建立"), row("待整理", overview.session?.pending || 0), row("档案天数", overview.archive?.days || 0)),
             h("div", { style: card }, h("div", { style: { fontWeight: 600, marginBottom: "6px" } }, "记忆层级"), row("core", overview.memory?.core || 0), row("active", overview.memory?.active || 0), row("knowledge", overview.memory?.knowledge || 0))),
           h("div", { style: { marginTop: "12px", fontSize: "12px", color: "var(--dsw-alias-label-tertiary)", lineHeight: "18px" } },
-            "这是最小核心：只含记忆/人格/统一会话，不加载 QQ、B站、桌宠。QQ/B站/桌宠后续作为组件接入。"));
+            "这是最小核心：只含记忆/人格/日会话，不加载 QQ、B站、桌宠。QQ/B站/桌宠后续作为组件接入。"));
       }
 
       function renderPersona() {
@@ -168,18 +168,22 @@ window.__ModuleLoader__.load({
       function renderSession() {
         if (!sessions) return h("div", { style: label }, "加载中…");
         const rows = sessions.recent || [];
+        const stats = sessions.stats || {};
+        const statusText = sessions.active ? `active · ${sessions.active.sessionId}` : "今天还没有日会话";
         return h("div", null,
-          h("div", { style: { ...label, marginBottom: "8px" } }, `共 ${sessions.stats?.conversations || 0} 个会话，${sessions.stats?.messages || 0} 个消息事件`),
+          h("div", { style: { ...label, marginBottom: "8px" } }, `今日 ${stats.currentDay || "—"} · ${statusText} · 待整理 ${stats.pending || 0}`),
           h("div", { style: { display: "flex", flexDirection: "column", gap: "6px" } },
-            rows.length === 0 ? h("div", { style: label }, "还没有 DSH 会话事件；在 DSH 对话窗口聊一句后刷新") : rows.map((item) => h("div", { key: item.key, style: { ...card, padding: "8px 10px" } },
-              h("div", { style: { fontSize: "12.5px" } }, item.key),
-              h("div", { style: { ...label, marginTop: "3px" } }, `${new Date(item.updatedAt || 0).toLocaleString()} · ${item.messageCount || 0} 个事件 · ${item.lastEventType || "—"}`)))));
+            rows.length === 0 ? h("div", { style: label }, "还没有日会话；DSH 对话窗口聊一句或重启插件后会自动建立") : rows.map((item) => h("div", { key: `${item.day}:${item.sessionId}`, style: { ...card, padding: "8px 10px" } },
+              h("div", { style: { display: "flex", justifyContent: "space-between", gap: "10px" } },
+                h("span", { style: { fontSize: "12.5px" } }, `${item.day} · ${item.state || item.status || "—"}`),
+                h("span", { style: { ...label, fontSize: "11px" } }, item.sessionId)),
+              h("div", { style: { ...label, marginTop: "3px" } }, `${item.archivePath ? "档案已写" : "未整理"}${item.consolidatedAt ? ` · ${new Date(item.consolidatedAt).toLocaleString()}` : ""}`)))));
       }
 
       return h("div", { style: { maxWidth: "980px", margin: "0 auto", color: "var(--dsw-alias-label-primary)", fontSize: "13px", lineHeight: "20px" } },
         h("div", { style: { display: "flex", alignItems: "baseline", gap: "10px", flexWrap: "wrap" } },
           h("h3", { style: { margin: 0, fontSize: "18px" } }, "OneFish"),
-          h("span", { style: { ...label, fontSize: "11px" } }, "Core v0.1.0 · 人格 / 记忆 / 统一会话"),
+          h("span", { style: { ...label, fontSize: "11px" } }, "Core v0.1.0 · 人格 / 记忆 / 日会话"),
           h("span", { style: { flex: 1 } }),
           h("button", { style: btn2, onClick: () => void load(), disabled: !!busy }, "刷新")),
         h("div", { style: { display: "flex", gap: "2px", margin: "12px 0", borderBottom: "1px solid var(--dsw-alias-border-l2)" } },

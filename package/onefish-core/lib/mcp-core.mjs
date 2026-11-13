@@ -127,15 +127,29 @@ server.tool(
 );
 
 server.tool(
+  'memory_archive_search',
+  '检索全量档案（按天归档的会话原文）；与 memory_search 的 memory-space 检索不同。',
+  {
+    query: z.string().min(1),
+    limit: z.number().int().min(1).max(50).optional(),
+  },
+  async ({ query, limit }) => {
+    try { return text(core.archive.search(query, { limit: limit || 8 })); }
+    catch (error) { return fail(error); }
+  }
+);
+
+server.tool(
   'session_get',
-  '查看当前统一会话状态（最近 DSH 会话、消息计数）。',
+  '查看日会话状态（今日 sessionId、封存/整理状态；消息历史在 DSH，不在此工具里）。',
   {},
   async () => {
     try {
+      const status = core.session.status();
       return text({
-        current: core.session.current(),
-        stats: core.session.stats(),
-        recent: core.session.list({ limit: 10 }),
+        current: status.active,
+        stats: status.stats,
+        recent: status.recent,
       });
     } catch (error) {
       return fail(error);

@@ -37,7 +37,7 @@ try {
     await client.connect(transport);
     const list = await client.listTools();
     const names = list.tools.map((tool) => tool.name);
-    for (const name of ['persona_get', 'memory_search', 'memory_add', 'memory_update', 'memory_delete', 'memory_list', 'session_get']) {
+    for (const name of ['persona_get', 'memory_search', 'memory_add', 'memory_update', 'memory_delete', 'memory_list', 'memory_archive_search', 'session_get']) {
       assert.ok(names.includes(name), `应注册工具：${name}`);
     }
 

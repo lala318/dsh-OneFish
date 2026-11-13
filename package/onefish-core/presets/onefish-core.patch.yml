@@ -6,7 +6,7 @@
       config:
         id: onefish-core
         name: OneFish Core
-        description: OneFish 最小核心：人格 + 长期记忆 + 统一会话；QQ/B站/桌宠作为可选组件。
+        description: OneFish 最小核心：人格 + 长期记忆 + 日会话生命周期；QQ/B站/桌宠作为可选组件。
         order: 20
         plugins:
           - id: persona

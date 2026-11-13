@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * OneFish Core 最小回归：人格 / 记忆 / 会话 / 插件注册 / preset 结构。
+ * OneFish Core 最小回归：人格 / 记忆 / 日会话 / 插件注册 / preset 结构。
  * 运行：node onefish-core/test/core.test.mjs
  */
 import assert from 'node:assert/strict';
@@ -64,13 +64,9 @@ try {
   assert.equal(core.memory.list({ includeDeleted: true }).filter((item) => item.id === added.id).length, 1);
   assert.ok(core.memory.stats().deleted >= 1);
 
-  // 会话
-  core.session.touchDsh('session-test-1', { type: 'message' });
-  core.session.touchDsh('session-test-1', { type: 'message' });
-  const current = core.session.current();
-  assert.equal(current.key, 'dsh:session-test-1');
-  assert.equal(current.messageCount, 2);
-  assert.equal(core.session.stats().conversations, 1);
+  // 会话索引：DSH 消息历史不归 core，默认没有 active 日会话。
+  assert.equal(core.session.stats().active, false);
+  assert.equal(core.session.stats().recent, 0);
 
   // 插件 apply（假 ctx，只验证注册不抛）
   process.env.ONEFISH_CORE_HOME = temp;

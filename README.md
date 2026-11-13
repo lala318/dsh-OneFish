@@ -10,7 +10,8 @@ OneFish/
       │  ├─ index.js       # DSH 宿主
       │  ├─ client.js      # 设置页
       │  ├─ mcp-core.mjs   # MCP server
-      │  └─ core/          # 人格 / 记忆 / 统一会话
+      │  ├─ core/          # 人格 / 记忆 / 日会话生命周期
+      │  └─ dsh/           # DSH session adapter
       ├─ presets/
       ├─ scripts/setup-dsh.mjs
       ├─ test/
@@ -38,7 +39,16 @@ npm run setup
 
 - 人格：`~/.dsh/onefish-core/core/persona.md`
 - 记忆：`~/.dsh/onefish-core/memory-v2/space/entries.jsonl`
-- 会话：`~/.dsh/onefish-core/core/sessions.json`
+- 日会话索引：`~/.dsh/onefish-core/core/session-index.json`（只存 day → sessionId）
+- 全量档案：`~/.dsh/onefish-core/archive/days/*.jsonl`
+- 日摘要：`~/.dsh/onefish-core/archive/digests/*.md`
+
+## 会话生命周期
+
+- **消息历史、上下文、会话 UI 归 DSH**；
+- Core 只负责：每天新建日会话、封存旧日会话、把旧会话整理进全量档案；
+- 逻辑日默认 **04:00**；
+- “回收”是归档/隐藏，不删除历史。
 
 ## 开发
 

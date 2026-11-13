@@ -2,15 +2,16 @@
  * OneFish Core —— DSH 宿主半边（MVP）。
  *
  * 只做三件事：
- *   1. 启动核心服务（人格 / 记忆 / 会话）；
+ *   1. 启动核心服务（人格 / 记忆 / 日会话生命周期）；
  *   2. 暴露最小设置页 API；
- *   3. 订阅 DSH 会话事件，记录统一会话。
+ *   3. 订阅 DSH 会话事件，更新日会话活跃时间。
  *
  * 不加载 QQ / B站 / 桌宠；那些以后作为可选组件接入。
  */
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createCore } from './core/index.js';
+import { createDshSessionAdapter } from './dsh/session-adapter.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../..');
@@ -18,10 +19,29 @@ const API_PREFIX = '/dsh-onefish-core/api';
 const VERSION = '0.1.0';
 
 export const name = 'onefish-core';
-export const inject = ['webServer', 'connection'];
+export const inject = ['webServer', 'connection', 'sessionController'];
 
 export function apply(ctx) {
-  const core = createCore({ repoRoot: REPO_ROOT, logger: (...args) => console.log('[onefish-core]', ...args) });
+  let sessionAdapter = null;
+  try {
+    let workspaceRegistry = null;
+    try {
+      workspaceRegistry = ctx.get?.('workspaceRegistry') ?? ctx.workspaceRegistry ?? null;
+    } catch {}
+    sessionAdapter = createDshSessionAdapter({
+      sessionController: ctx.sessionController,
+      workspaceRegistry,
+      logger: (...args) => console.log('[onefish-core]', ...args),
+    });
+  } catch (error) {
+    console.log(`[onefish-core] 会话适配器不可用：${error?.message ?? error}`);
+  }
+
+  const core = createCore({
+    repoRoot: REPO_ROOT,
+    logger: (...args) => console.log('[onefish-core]', ...args),
+    sessionAdapter,
+  });
   const disposers = [];
 
   function json(res, code, value) {
@@ -109,6 +129,8 @@ export function apply(ctx) {
       memory: core.memory.health(),
       session: core.session.stats(),
       currentSession: core.session.current(),
+      recentSessions: core.session.list({ limit: 8 }),
+      archive: { days: core.archive.listDays().length },
       recentMemories: core.memory.list({ limit: 8 }),
     };
   }
@@ -169,7 +191,29 @@ export function apply(ctx) {
       return;
     }
     if (pathname === `${API_PREFIX}/sessions` && req.method === 'GET') {
-      json(res, 200, { ok: true, current: core.session.current(), stats: core.session.stats(), recent: core.session.list({ limit: 20 }) });
+      const status = core.session.status();
+      json(res, 200, { ok: true, ...status, current: status.active });
+      return;
+    }
+    if (pathname === `${API_PREFIX}/session/ensure` && req.method === 'POST') {
+      const result = await core.session.ensureToday();
+      json(res, 200, { ok: true, ...result });
+      return;
+    }
+    if (pathname === `${API_PREFIX}/session/consolidate` && req.method === 'POST') {
+      const body = await readBody(req);
+      const day = String(body?.day || '').trim();
+      if (!day) { json(res, 400, { ok: false, error: 'day 不能为空' }); return; }
+      const result = await core.session.consolidateDay(day, { force: body?.force === true });
+      json(res, 200, { ok: true, ...result });
+      return;
+    }
+    if (pathname === `${API_PREFIX}/session/retire` && req.method === 'POST') {
+      const body = await readBody(req);
+      const sessionId = String(body?.sessionId || '').trim();
+      if (!sessionId) { json(res, 400, { ok: false, error: 'sessionId 不能为空' }); return; }
+      const result = await core.session.retire(sessionId);
+      json(res, 200, { ok: true, ...result });
       return;
     }
     json(res, 404, { ok: false, error: '未知接口' });
@@ -181,7 +225,7 @@ export function apply(ctx) {
       off = ctx.on('session/event', (session, event) => {
         try {
           const sessionId = session?.id || event?.sessionId || event?.session_id || '';
-          if (sessionId) core.session.touchDsh(sessionId, event || {});
+          if (sessionId) core.session.noteActivity(sessionId, event || {});
         } catch (error) {
           core.log(`会话事件处理失败：${error?.message ?? error}`);
         }
@@ -191,14 +235,29 @@ export function apply(ctx) {
     core.log(`会话事件监听注册失败：${error?.message ?? error}`);
   }
 
+  let bootstrapTimer = null;
+  let dayTimer = null;
+  if (sessionAdapter) {
+    bootstrapTimer = setTimeout(() => {
+      core.session.bootstrap().catch((error) => core.log(`启动日会话失败：${error?.message ?? error}`));
+    }, 1200);
+    bootstrapTimer.unref?.();
+    dayTimer = setInterval(() => {
+      core.session.ensureToday().catch((error) => core.log(`日会话检查失败：${error?.message ?? error}`));
+    }, 5 * 60 * 1000);
+    dayTimer.unref?.();
+  }
+
   if (typeof ctx.effect === 'function') {
     ctx.effect(() => () => {
       try { off?.(); } catch {}
+      try { if (bootstrapTimer) clearTimeout(bootstrapTimer); } catch {}
+      try { if (dayTimer) clearInterval(dayTimer); } catch {}
       for (const dispose of disposers.splice(0)) { try { dispose?.(); } catch {} }
     });
   }
 
-  core.log(`OneFish Core 已激活 v${VERSION}；home=${core.paths.home}`);
+  core.log(`OneFish Core 已激活 v${VERSION}；home=${core.paths.home}；sessionAdapter=${Boolean(sessionAdapter)}`);
 }
 
 export default { name, inject, apply };

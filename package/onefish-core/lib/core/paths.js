@@ -39,14 +39,26 @@ export function createCorePaths({ home = '', repoRoot = process.cwd() } = {}) {
     charactersDir: path.join(coreHome, 'characters'),
     currentCharacterFile: path.join(coreHome, 'characters', 'current.json'),
     coreDir: path.join(coreHome, 'core'),
-    sessionsFile: path.join(coreHome, 'core', 'sessions.json'),
+    // 日会话索引：只存 day → sessionId / 状态，不存消息。
+    sessionIndexFile: path.join(coreHome, 'core', 'session-index.json'),
+    configFile: path.join(coreHome, 'core', 'config.json'),
+    archiveDir: path.join(coreHome, 'archive'),
+    archiveDaysDir: path.join(coreHome, 'archive', 'days'),
+    archiveDigestsDir: path.join(coreHome, 'archive', 'digests'),
     pluginLog: path.join(coreHome, 'core', 'plugin.log'),
     fallbackPersona: path.join(coreHome, 'core', 'persona.md'),
   };
 }
 
 export function ensureCoreDirs(paths) {
-  for (const dir of [paths.home, paths.coreDir, paths.charactersDir]) {
+  for (const dir of [
+    paths.home,
+    paths.coreDir,
+    paths.charactersDir,
+    paths.archiveDir,
+    paths.archiveDaysDir,
+    paths.archiveDigestsDir,
+  ]) {
     try { fs.mkdirSync(dir, { recursive: true }); } catch {}
   }
 }
