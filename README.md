@@ -34,6 +34,7 @@ OneFish/
 - [ADR-0003：全量记忆与 memory-space 分层，日终整理](docs/adr/0003-memory-layers-and-consolidation.md)
 - [ADR-0004：日会话创建时注入开机包](docs/adr/0004-boot-pack.md)
 - [ADR-0005：Component Contract v1](docs/adr/0005-component-contract.md)
+- [组件接入规范](docs/guides/COMPONENT-INTEGRATION.md)
 
 ## 安装 / 注册
 

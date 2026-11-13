@@ -151,6 +151,8 @@ Outbound：
 
 ## 实现状态
 
+实现指南：[COMPONENT-INTEGRATION.md](../guides/COMPONENT-INTEGRATION.md)。
+
 | 部分 | 状态 |
 | --- | --- |
 | `packages/component-sdk` | 已实现 manifest / envelope 校验 |
