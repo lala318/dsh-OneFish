@@ -10,8 +10,13 @@ OneFish/
       │  ├─ index.js       # DSH 宿主
       │  ├─ client.js      # 设置页
       │  ├─ mcp-core.mjs   # MCP server
-      │  ├─ core/          # 人格 / 记忆 / 日会话生命周期
-      │  └─ dsh/           # DSH session adapter
+      │  └─ core/
+      │     ├─ domain/     # 纯规则：日切 / 摘要 / 配置归一化
+      │     ├─ application/# 用例：人格 / 记忆 / 日会话 / 开机包
+      │     ├─ adapters/
+      │     │  ├─ fs/      # 文件存储
+      │     │  └─ dsh/     # DSH session/workspace
+      │     └─ index.js    # Core 组合根 / 公开出口
       ├─ presets/
       ├─ scripts/setup-dsh.mjs
       ├─ test/

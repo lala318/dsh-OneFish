@@ -1,0 +1,39 @@
+#!/usr/bin/env node
+/**
+ * 分层边界回归：
+ * - domain 不读文件、不依赖 DSH/MCP；
+ * - adapters 子目录存在；
+ * - host 只通过 core/index 与 adapters/dsh 接触。
+ */
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+
+const root = path.resolve(import.meta.dirname, '..');
+const core = path.join(root, 'lib', 'core');
+const domain = path.join(core, 'domain');
+const application = path.join(core, 'application');
+const adaptersFs = path.join(core, 'adapters', 'fs');
+const adaptersDsh = path.join(core, 'adapters', 'dsh');
+
+for (const dir of [domain, application, adaptersFs, adaptersDsh]) {
+  assert.ok(fs.existsSync(dir), `缺少目录：${dir}`);
+}
+
+const domainFiles = fs.readdirSync(domain).filter((name) => name.endsWith('.js'));
+assert.ok(domainFiles.length >= 3);
+for (const name of domainFiles) {
+  const source = fs.readFileSync(path.join(domain, name), 'utf8');
+  assert.doesNotMatch(source, /from ['"]node:fs['"]/, `${name} 不应 import node:fs`);
+  assert.doesNotMatch(source, /from ['"]node:path['"]/, `${name} 不应 import node:path`);
+  assert.doesNotMatch(source, /@deepseek-ai|mcp__|\.\.\/adapters/, `${name} 不应依赖 DSH/MCP/adapters`);
+}
+
+const host = fs.readFileSync(path.join(root, 'lib', 'index.js'), 'utf8');
+assert.match(host, /from '\.\/core\/adapters\/dsh\/session-adapter\.js'/);
+assert.match(host, /from '\.\/core\/index\.js'/);
+
+const adapterTest = fs.readFileSync(path.join(root, 'test', 'session-adapter.test.mjs'), 'utf8');
+assert.match(adapterTest, /lib\/core\/adapters\/dsh\/session-adapter\.js/);
+
+console.log('✅ 分层边界测试通过');

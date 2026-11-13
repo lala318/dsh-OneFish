@@ -4,8 +4,8 @@
  * 只拼文本，不写会话；由宿主通过 DSH developer/message 注入到日会话。
  * 内容优先级：核心记忆 → 人格卡 → 主动记忆 → 昨日摘要 → 近期档案 → 使用说明。
  */
-import { shiftDay } from './day.js';
-import { DEFAULT_CONFIG } from './config.js';
+import { shiftDay } from '../domain/day.js';
+import { DEFAULT_CONFIG } from '../domain/config.js';
 
 function truncate(text, max) {
   const value = String(text || '').trim();

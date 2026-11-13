@@ -36,12 +36,29 @@ OneFish 最初尝试把核心设计成可脱离 DSH 独立存在的 `packages/co
 ```text
 DSH（宿主 / runtime）
 └─ OneFish 插件（core kernel）
-   ├─ domain：persona / memory / daily-session
-   ├─ adapters：DSH session / tools / settings
-   └─ public API
+   ├─ domain：日切 / 摘要 / 配置归一化等纯规则
+   ├─ application：人格 / 记忆 / 日会话 / 开机包等用例
+   ├─ adapters：fs 存储 / DSH session / workspace
+   └─ public API（core/index.js）
         ↑
 components：qq / bili / pet（可选频道组件）
 ```
+
+目录对应：
+
+```text
+lib/core/
+├─ domain/
+├─ application/
+├─ adapters/
+│  ├─ fs/
+│  └─ dsh/
+└─ index.js
+```
+
+> 实现状态：目录分层（阶段 A）已完成。`domain` 不读文件、不依赖 DSH；
+> `application/persona.js` / `memory.js` 目前仍有文件 IO，阶段 B 再把存储下沉到
+> `adapters/fs`，让 application 只依赖 domain + ports。
 
 ## 后果
 

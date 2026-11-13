@@ -128,7 +128,7 @@ server.tool(
 
 server.tool(
   'memory_archive_search',
-  '检索全量档案（按天归档的会话原文）；与 memory_search 的 memory-space 检索不同。',
+  '检索全量档案（按天归档的会话原文）；与 memory_search 的 memory-space 检索不同，建议只在有必要时使用。',
   {
     query: z.string().min(1),
     limit: z.number().int().min(1).max(50).optional(),

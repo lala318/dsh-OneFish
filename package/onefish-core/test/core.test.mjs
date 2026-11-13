@@ -30,7 +30,7 @@ try {
 
   // 默认数据根必须与旧 SurfCore 隔离。
   const childHome = path.join(temp, 'dsh-home');
-  const pathsModule = pathToFileURL(path.join(root, 'onefish-core/lib/core/paths.js')).href;
+  const pathsModule = pathToFileURL(path.join(root, 'onefish-core/lib/core/adapters/fs/paths.js')).href;
   const defaultHome = execFileSync(process.execPath, [
     '--input-type=module',
     '-e',

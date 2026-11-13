@@ -5,7 +5,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { buildDigest, normalizeRecords, sourceHash } from './consolidation.js';
+import { buildDigest, normalizeRecords, sourceHash } from '../../domain/consolidation.js';
 
 function ensureDir(dir) {
   fs.mkdirSync(dir, { recursive: true });

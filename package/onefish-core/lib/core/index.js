@@ -10,13 +10,14 @@
  *   archive  全量档案
  */
 import fs from 'node:fs';
-import { createCorePaths, ensureCoreDirs } from './paths.js';
-import { createPersonaService } from './persona.js';
-import { createMemoryService } from './memory.js';
-import { createSessionService } from './session.js';
-import { createArchiveService } from './archive.js';
-import { createBootPackService } from './boot-pack.js';
-import { DEFAULT_CONFIG, loadConfig } from './config.js';
+import { createCorePaths, ensureCoreDirs } from './adapters/fs/paths.js';
+import { createPersonaService } from './application/persona.js';
+import { createMemoryService } from './application/memory.js';
+import { createSessionService } from './application/session.js';
+import { createArchiveService } from './adapters/fs/archive.js';
+import { createBootPackService } from './application/boot-pack.js';
+import { DEFAULT_CONFIG } from './domain/config.js';
+import { loadConfig } from './adapters/fs/config.js';
 
 export function createCore({
   home = '',
@@ -69,5 +70,5 @@ export function createCore({
   return { paths, config, persona, memory, session, archive, bootPack, health, log };
 }
 
-export { createCorePaths, resolveCoreHome } from './paths.js';
-export { dayKeyOf, dayStart, dayEnd } from './day.js';
+export { createCorePaths, resolveCoreHome } from './adapters/fs/paths.js';
+export { dayKeyOf, dayStart, dayEnd } from './domain/day.js';

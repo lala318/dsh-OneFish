@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createCore } from '../lib/core/index.js';
-import { dayKeyOf, dayStart } from '../lib/core/day.js';
+import { dayKeyOf, dayStart } from '../lib/core/domain/day.js';
 
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'onefish-session-test-'));
 let now = new Date(2026, 10, 13, 12, 0, 0, 0).getTime();

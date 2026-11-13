@@ -3,7 +3,7 @@
  * DSH 会话适配层回归：用假 controller 验证 workspace/create/rename/history/archive 的调用形状。
  */
 import assert from 'node:assert/strict';
-import { createDshSessionAdapter } from '../lib/dsh/session-adapter.js';
+import { createDshSessionAdapter } from '../lib/core/adapters/dsh/session-adapter.js';
 
 const calls = { create: [], rename: [], events: [], archive: [], workspaceCreate: [], append: [] };
 const sessions = {

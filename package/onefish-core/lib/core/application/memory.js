@@ -10,7 +10,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { createMemorySpace } from './memory-space.js';
+import { createMemorySpace } from '../adapters/fs/memory-space.js';
 
 function exists(p) {
   try { return fs.existsSync(p); } catch { return false; }

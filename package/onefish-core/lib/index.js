@@ -11,7 +11,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createCore } from './core/index.js';
-import { createDshSessionAdapter } from './dsh/session-adapter.js';
+import { createDshSessionAdapter } from './core/adapters/dsh/session-adapter.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../..');
