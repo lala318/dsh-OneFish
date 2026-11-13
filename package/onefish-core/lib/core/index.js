@@ -29,6 +29,7 @@ export function createCore({
   ensureCoreDirs(paths);
 
   const config = { ...DEFAULT_CONFIG, ...loadConfig(paths.configFile), ...configOverride };
+  if (!config.workspacePath) config.workspacePath = paths.workspacePath;
   const persona = createPersonaService({ paths, logger });
   const memory = createMemoryService({ paths, persona, logger });
   const archive = createArchiveService({ paths, logger });

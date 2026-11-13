@@ -16,8 +16,15 @@ const adapter = {
   createCount: 0,
   historyCalls: 0,
   archived: [],
-  async createDaily({ preset, day }) {
+  workspaceCalls: 0,
+  async ensureWorkspace({ path: workspacePath, title }) {
+    this.workspaceCalls += 1;
+    this.workspaceArgs = { workspacePath, title };
+    return { workspaceId: 'workspace-onefish', workspaceTitle: title, workspacePath };
+  },
+  async createDaily({ preset, day, workspaceId }) {
     this.createCount += 1;
+    this.lastWorkspaceId = workspaceId;
     return { sessionId: `session-test-${this.createCount}`, preset: preset || 'onefish-core', day };
   },
   async history() {
@@ -43,12 +50,16 @@ try {
     repoRoot: path.resolve(import.meta.dirname, '../..'),
     sessionAdapter: adapter,
     now: () => now,
-    config: { autoConsolidate: false, consolidateOnBootstrap: false, rolloverHour: 4 },
+    config: { autoConsolidate: false, consolidateOnBootstrap: false, rolloverHour: 4, workspacePath: temp, workspaceTitle: 'onefish' },
   });
 
   const first = await core.session.ensureToday();
   assert.equal(first.day, '2026-11-13');
   assert.equal(first.sessionId, 'session-test-1');
+  assert.equal(first.workspaceId, 'workspace-onefish');
+  assert.equal(first.workspaceTitle, 'onefish');
+  assert.equal(adapter.lastWorkspaceId, 'workspace-onefish');
+  assert.equal(adapter.workspaceCalls, 1);
   assert.equal(first.created, true);
   assert.equal(core.session.stats().active, true);
   assert.equal(core.session.current().status, 'active');

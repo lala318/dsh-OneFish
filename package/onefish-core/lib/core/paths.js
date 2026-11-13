@@ -39,7 +39,6 @@ export function createCorePaths({ home = '', repoRoot = process.cwd() } = {}) {
     charactersDir: path.join(coreHome, 'characters'),
     currentCharacterFile: path.join(coreHome, 'characters', 'current.json'),
     coreDir: path.join(coreHome, 'core'),
-    // 日会话索引：只存 day → sessionId / 状态，不存消息。
     sessionIndexFile: path.join(coreHome, 'core', 'session-index.json'),
     configFile: path.join(coreHome, 'core', 'config.json'),
     archiveDir: path.join(coreHome, 'archive'),
@@ -47,6 +46,8 @@ export function createCorePaths({ home = '', repoRoot = process.cwd() } = {}) {
     archiveDigestsDir: path.join(coreHome, 'archive', 'digests'),
     pluginLog: path.join(coreHome, 'core', 'plugin.log'),
     fallbackPersona: path.join(coreHome, 'core', 'persona.md'),
+    // 日会话专用 DSH workspace；默认指向独立项目目录。
+    workspacePath: path.join(DSH_HOME, 'OneFish'),
   };
 }
 

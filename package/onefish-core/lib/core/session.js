@@ -55,6 +55,8 @@ export function createSessionService({
       active: Boolean(state.active),
       day: state.active?.day || '',
       sessionId: state.active?.sessionId || '',
+      workspaceId: state.active?.workspaceId || '',
+      workspaceTitle: state.active?.workspaceTitle || '',
       currentDay: activeDay,
       recent: state.recent.length,
       pending: state.recent.filter((item) => item.status === 'pending' || item.status === 'failed').length,
@@ -73,6 +75,8 @@ export function createSessionService({
         rolloverHour: options.rolloverHour,
         preset: options.preset,
         titlePrefix: options.titlePrefix,
+        workspaceTitle: options.workspaceTitle,
+        workspacePath: options.workspacePath,
         autoConsolidate: options.autoConsolidate,
       },
     };
@@ -94,21 +98,48 @@ export function createSessionService({
     return state.active;
   }
 
-  async function createDaily(day) {
+  async function ensureWorkspace() {
+    if (!options.workspacePath || !adapter || typeof adapter.ensureWorkspace !== 'function') return null;
+    try {
+      return await adapter.ensureWorkspace({
+        path: options.workspacePath,
+        title: options.workspaceTitle,
+      });
+    } catch (error) {
+      logger(`DSH workspace 准备失败 ${options.workspacePath}：${error?.message ?? error}`);
+      return null;
+    }
+  }
+
+  async function createDaily(day, workspace = null) {
     if (!adapter) throw new Error('DSH session adapter is not available');
     const title = `${options.titlePrefix} ${day}`;
-    const created = await adapter.createDaily({ preset: options.preset, title, day });
+    const created = await adapter.createDaily({
+      preset: options.preset,
+      title,
+      day,
+      workspaceId: workspace?.workspaceId || '',
+      cwd: options.workspacePath,
+    });
     const sessionId = String(created?.sessionId || '').trim();
     if (!sessionId) throw new Error('DSH session.create returned no sessionId');
     return {
       day,
       sessionId,
       preset: String(created?.preset || options.preset),
+      workspaceId: String(workspace?.workspaceId || ''),
+      workspaceTitle: String(workspace?.workspaceTitle || ''),
+      workspacePath: String(workspace?.workspacePath || options.workspacePath || ''),
       createdAt: now(),
       lastActivityAt: now(),
       eventCount: 0,
       status: 'active',
     };
+  }
+
+  function sameWorkspace(active, workspace) {
+    if (!workspace) return true;
+    return String(active?.workspaceId || '') === String(workspace.workspaceId || '');
   }
 
   /** 归档某天（DSH archive，不删除历史）；归档失败不阻塞整理。 */
@@ -127,10 +158,34 @@ export function createSessionService({
     if (ensureInflight) return ensureInflight;
     ensureInflight = (async () => {
       const day = currentDay();
+      const workspace = await ensureWorkspace();
       const state = index.read();
-      if (state.active?.day === day) return { ...state.active, created: false, reused: true };
+      if (state.active?.day === day && sameWorkspace(state.active, workspace)) {
+        return { ...state.active, created: false, reused: true };
+      }
       const previous = state.active;
-      const created = await createDaily(day);
+
+      // 同一天但 workspace 变了：只有空会话可以无缝迁移；
+      // 有消息的会话不强行搬，留给用户/后续迁移工具处理。
+      if (previous && previous.day === day && !sameWorkspace(previous, workspace)) {
+        if (Number(previous.eventCount || 0) > 0) {
+          logger(`日会话 workspace 不一致，但当前会话已有消息，保留原会话 ${previous.sessionId}`);
+          return { ...previous, created: false, reused: true, workspaceMismatch: true };
+        }
+        const created = await createDaily(day, workspace);
+        index.sealActive({ status: 'retired', sealedAt: now() });
+        try {
+          await adapter.archive(previous.sessionId, { stopActivity: true });
+          index.updateRecent(previous.day, { archivedAt: now() });
+        } catch (error) {
+          logger(`旧 workspace 会话归档失败 ${previous.sessionId}：${error?.message ?? error}`);
+        }
+        index.setActive(created);
+        logger(`日会话已迁移到 workspace：${day} / ${created.sessionId}`);
+        return { ...created, created: true, previousDay: previous.day, migrated: true };
+      }
+
+      const created = await createDaily(day, workspace);
       if (previous) {
         index.sealActive({ status: 'pending', sealedAt: now() });
         if (options.autoConsolidate) {
@@ -145,7 +200,7 @@ export function createSessionService({
         }
       }
       index.setActive(created);
-      logger(`日会话已创建：${day} / ${created.sessionId}`);
+      logger(`日会话已创建：${day} / ${created.sessionId}${workspace ? ` @ ${workspace.workspaceTitle}` : ''}`);
       return { ...created, created: true, previousDay: previous?.day || '' };
     })().finally(() => {
       ensureInflight = null;

@@ -41,7 +41,11 @@ npm run setup
 DSH 拥有消息历史、上下文和会话 UI；Core 只管理日会话：
 
 - 逻辑日默认 **04:00**（可在 `core/config.json` 改 `rolloverHour`）；
+- 日会话放在专用 DSH workspace：默认标题 `onefish`，路径 `~/.dsh/OneFish`；
 - 当天首次需要会话时创建 `onefish-core` preset 的 DSH session；
 - 换日后封存旧会话，并异步整理进全量档案；
 - 整理失败保留 pending，下次启动重试；
 - “回收”使用 DSH archive，不删除历史。
+
+> DSH 会隐藏“空白会话”（还没有 turn 的 session）。今天的日会话已经在 `onefish` 工作区预建，
+> 打开该工作区点“新建对话”就会复用这条会话；它不会作为空行出现在普通会话列表里。

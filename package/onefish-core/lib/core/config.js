@@ -10,6 +10,8 @@ export const DEFAULT_CONFIG = Object.freeze({
   rolloverHour: DEFAULT_ROLLOVER_HOUR,
   preset: 'onefish-core',
   titlePrefix: 'OneFish',
+  workspaceTitle: 'onefish',
+  workspacePath: '',
   autoConsolidate: true,
   consolidateOnBootstrap: true,
   historyPageMessages: 200,
@@ -42,6 +44,8 @@ export function loadConfig(file) {
     historyMaxPages: clampInt(raw.historyMaxPages, DEFAULT_CONFIG.historyMaxPages, 1, 200),
     preset: typeof raw.preset === 'string' && raw.preset.trim() ? raw.preset.trim() : DEFAULT_CONFIG.preset,
     titlePrefix: typeof raw.titlePrefix === 'string' && raw.titlePrefix.trim() ? raw.titlePrefix.trim() : DEFAULT_CONFIG.titlePrefix,
+    workspaceTitle: typeof raw.workspaceTitle === 'string' && raw.workspaceTitle.trim() ? raw.workspaceTitle.trim() : DEFAULT_CONFIG.workspaceTitle,
+    workspacePath: typeof raw.workspacePath === 'string' && raw.workspacePath.trim() ? raw.workspacePath.trim() : DEFAULT_CONFIG.workspacePath,
     autoConsolidate: raw.autoConsolidate !== false,
     consolidateOnBootstrap: raw.consolidateOnBootstrap !== false,
   };

@@ -66,6 +66,7 @@ Core 提供以下生命周期操作：
 
 - 逻辑日边界默认 **04:00（本地时区）**，可配置；
 - 每个逻辑日只创建一个 DSH session，preset 为 `onefish-core`；
+- 日会话固定放在专用 DSH workspace：标题 `onefish`，路径 `~/.dsh/OneFish`；
 - DSH 窗口、QQ、B站、桌宠共用这一天会话；
 - 频道组件不自己创建会话，只调用 Core 的 `ensureToday({ channel })` 获取当天 sessionId；
 - 跨天第一次访问时，Core 先封存昨天，再创建今天；

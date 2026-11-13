@@ -127,7 +127,7 @@ window.__ModuleLoader__.load({
         return h("div", null,
           h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: "10px" } },
             h("div", { style: card }, h("div", { style: { fontWeight: 600, marginBottom: "6px" } }, "核心"), row("数据目录", overview.home), row("人格", overview.persona?.name), row("人格字数", overview.persona?.chars), row("记忆", `${overview.memory?.total || 0} 条`)),
-            h("div", { style: card }, h("div", { style: { fontWeight: 600, marginBottom: "6px" } }, "会话"), row("今日", overview.session?.currentDay || "—"), row("状态", overview.session?.active ? "active" : "未建立"), row("待整理", overview.session?.pending || 0), row("档案天数", overview.archive?.days || 0)),
+            h("div", { style: card }, h("div", { style: { fontWeight: 600, marginBottom: "6px" } }, "会话"), row("今日", overview.session?.currentDay || "—"), row("工作区", overview.session?.workspaceTitle || "—"), row("状态", overview.session?.active ? "active" : "未建立"), row("待整理", overview.session?.pending || 0)),
             h("div", { style: card }, h("div", { style: { fontWeight: 600, marginBottom: "6px" } }, "记忆层级"), row("core", overview.memory?.core || 0), row("active", overview.memory?.active || 0), row("knowledge", overview.memory?.knowledge || 0))),
           h("div", { style: { marginTop: "12px", fontSize: "12px", color: "var(--dsw-alias-label-tertiary)", lineHeight: "18px" } },
             "这是最小核心：只含记忆/人格/日会话，不加载 QQ、B站、桌宠。QQ/B站/桌宠后续作为组件接入。"));
@@ -171,7 +171,8 @@ window.__ModuleLoader__.load({
         const stats = sessions.stats || {};
         const statusText = sessions.active ? `active · ${sessions.active.sessionId}` : "今天还没有日会话";
         return h("div", null,
-          h("div", { style: { ...label, marginBottom: "8px" } }, `今日 ${stats.currentDay || "—"} · ${statusText} · 待整理 ${stats.pending || 0}`),
+          h("div", { style: { ...label, marginBottom: "8px" } }, `今日 ${stats.currentDay || "—"} · 工作区 ${stats.workspaceTitle || "—"} · ${statusText} · 待整理 ${stats.pending || 0}`),
+          h("div", { style: { ...label, marginBottom: "8px" } }, `DSH 会隐藏空白会话；去「${stats.workspaceTitle || "onefish"}」工作区点“新建对话”即可复用今天的日会话。`),
           h("div", { style: { display: "flex", flexDirection: "column", gap: "6px" } },
             rows.length === 0 ? h("div", { style: label }, "还没有日会话；DSH 对话窗口聊一句或重启插件后会自动建立") : rows.map((item) => h("div", { key: `${item.day}:${item.sessionId}`, style: { ...card, padding: "8px 10px" } },
               h("div", { style: { display: "flex", justifyContent: "space-between", gap: "10px" } },

@@ -12,8 +12,38 @@ export function createDshSessionAdapter({
 } = {}) {
   if (!sessionController) throw new Error('sessionController is not available');
 
-  async function createDaily({ preset, title, day } = {}) {
-    const created = await sessionController.create({ agentPreset: preset });
+  let workspaceCache = null;
+
+  async function ensureWorkspace({ path, title } = {}) {
+    if (!path || !workspaceRegistry) return null;
+    if (workspaceCache && workspaceCache.path === path && workspaceCache.title === title) return workspaceCache;
+    let workspace = null;
+    if (typeof workspaceRegistry.resolveByPath === 'function') {
+      workspace = await workspaceRegistry.resolveByPath(path);
+    }
+    if (!workspace && typeof workspaceRegistry.create === 'function') {
+      workspace = await workspaceRegistry.create(path, title);
+    }
+    if (!workspace) return null;
+    if (title && workspace.title !== title && typeof workspace.setTitle === 'function') {
+      await workspace.setTitle(title);
+      if (typeof workspaceRegistry.get === 'function') workspace = workspaceRegistry.get(workspace.id) || workspace;
+    }
+    workspaceCache = {
+      workspaceId: String(workspace.id || ''),
+      workspaceTitle: String(workspace.title || title || ''),
+      workspacePath: String(workspace.path || path || ''),
+    };
+    logger(`DSH workspace 已就绪：${workspaceCache.workspaceTitle} (${workspaceCache.workspaceId})`);
+    return workspaceCache;
+  }
+
+  async function createDaily({ preset, title, day, workspaceId, cwd } = {}) {
+    const created = await sessionController.create({
+      agentPreset: preset,
+      ...(workspaceId ? { workspaceId } : {}),
+      ...(!workspaceId && cwd ? { cwd } : {}),
+    });
     const sessionId = String(created?.sessionId || '').trim();
     if (!sessionId) throw new Error('sessionController.create returned no sessionId');
     if (title && typeof sessionController.rename === 'function') {
@@ -23,7 +53,7 @@ export function createDshSessionAdapter({
         logger(`日会话重命名失败 ${sessionId}：${error?.message ?? error}`);
       }
     }
-    logger(`DSH 日会话已创建：${day || ''} ${sessionId}`);
+    logger(`DSH 日会话已创建：${day || ''} ${sessionId}${workspaceId ? ` @ ${workspaceId}` : ''}`);
     return { sessionId, preset: String(created?.agentPreset || preset || '') };
   }
 
@@ -56,5 +86,5 @@ export function createDshSessionAdapter({
     logger(`DSH 会话已归档：${sessionId}`);
   }
 
-  return { createDaily, history, archive };
+  return { ensureWorkspace, createDaily, history, archive };
 }
