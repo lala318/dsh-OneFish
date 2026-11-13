@@ -4,23 +4,27 @@ OneFish 独立项目：和重构前的 SurfCore 仓库分开，只保留最小�
 
 ```text
 OneFish/
-└─ package/
-   └─ onefish-core/        # DSH 插件包（自包含）
-      ├─ lib/
-      │  ├─ index.js       # DSH 宿主
-      │  ├─ client.js      # 设置页
-      │  ├─ mcp-core.mjs   # MCP server
-      │  └─ core/
-      │     ├─ domain/     # 纯规则：日切 / 摘要 / 配置归一化
-      │     ├─ application/# 用例：人格 / 记忆 / 日会话 / 开机包
-      │     ├─ adapters/
-      │     │  ├─ fs/      # 文件存储
-      │     │  └─ dsh/     # DSH session/workspace
-      │     └─ index.js    # Core 组合根 / 公开出口
-      ├─ presets/
-      ├─ scripts/setup-dsh.mjs
-      ├─ test/
-      └─ package.json
+├─ package/
+│  └─ onefish-core/        # DSH 插件包（自包含）
+│     ├─ lib/
+│     │  ├─ index.js       # DSH 宿主
+│     │  ├─ client.js      # 设置页
+│     │  ├─ mcp-core.mjs   # MCP server
+│     │  └─ core/
+│     │     ├─ domain/     # 纯规则：日切 / 摘要 / 配置归一化
+│     │     ├─ application/# 用例：人格 / 记忆 / 日会话 / 开机包
+│     │     ├─ adapters/
+│     │     │  ├─ fs/      # 文件存储
+│     │     │  └─ dsh/     # DSH session/workspace/broker
+│     │     └─ index.js    # Core 组合根 / 公开出口
+│     ├─ presets/
+│     ├─ scripts/setup-dsh.mjs
+│     ├─ test/
+│     └─ package.json
+├─ packages/
+│  └─ component-sdk/       # 组件契约 v1
+└─ components/
+   └─ echo/                # 契约假组件
 ```
 
 ## 架构决策
@@ -29,6 +33,7 @@ OneFish/
 - [ADR-0002：会话运行时归 DSH，生命周期归 Core](docs/adr/0002-session-ownership.md)
 - [ADR-0003：全量记忆与 memory-space 分层，日终整理](docs/adr/0003-memory-layers-and-consolidation.md)
 - [ADR-0004：日会话创建时注入开机包](docs/adr/0004-boot-pack.md)
+- [ADR-0005：Component Contract v1](docs/adr/0005-component-contract.md)
 
 ## 安装 / 注册
 

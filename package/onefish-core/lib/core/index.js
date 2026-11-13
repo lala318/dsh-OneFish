@@ -18,7 +18,9 @@ import { createPersonaService } from './application/persona.js';
 import { createMemoryService } from './application/memory.js';
 import { createSessionService } from './application/session.js';
 import { createArchiveService } from './adapters/fs/archive.js';
+import { createComponentStore } from './adapters/fs/component-store.js';
 import { createBootPackService } from './application/boot-pack.js';
+import { createComponentRegistry } from './application/components.js';
 import { DEFAULT_CONFIG } from './domain/config.js';
 import { loadConfig } from './adapters/fs/config.js';
 
@@ -52,6 +54,15 @@ export function createCore({
     logger,
     now,
   });
+  const componentStore = createComponentStore({ paths });
+  const components = createComponentRegistry({
+    core: { session, persona, memory, bootPack, config },
+    componentStore,
+    version: '0.1.0',
+    logger,
+    config,
+  });
+  const componentApi = { apiVersion: 1, components };
 
   function health() {
     return {
@@ -63,6 +74,7 @@ export function createCore({
       memory: memory.health(),
       session: session.stats(),
       archive: { days: archive.listDays().length },
+      components: components.list(),
     };
   }
 
@@ -74,7 +86,7 @@ export function createCore({
     try { logger(line); } catch {}
   }
 
-  return { paths, config, persona, memory, session, archive, bootPack, health, log };
+  return { paths, config, persona, memory, session, archive, bootPack, components, componentApi, health, log };
 }
 
 export { createCorePaths, resolveCoreHome } from './adapters/fs/paths.js';

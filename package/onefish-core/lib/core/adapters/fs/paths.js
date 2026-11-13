@@ -44,6 +44,7 @@ export function createCorePaths({ home = '', repoRoot = process.cwd() } = {}) {
     archiveDir: path.join(coreHome, 'archive'),
     archiveDaysDir: path.join(coreHome, 'archive', 'days'),
     archiveDigestsDir: path.join(coreHome, 'archive', 'digests'),
+    componentsDir: path.join(coreHome, 'components'),
     pluginLog: path.join(coreHome, 'core', 'plugin.log'),
     fallbackPersona: path.join(coreHome, 'core', 'persona.md'),
     // 日会话专用 DSH workspace；默认指向独立项目目录。
@@ -59,6 +60,7 @@ export function ensureCoreDirs(paths) {
     paths.archiveDir,
     paths.archiveDaysDir,
     paths.archiveDigestsDir,
+    paths.componentsDir,
   ]) {
     try { fs.mkdirSync(dir, { recursive: true }); } catch {}
   }

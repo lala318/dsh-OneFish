@@ -18,6 +18,7 @@ export const DEFAULT_CONFIG = Object.freeze({
   digestMaxChars: 1200,
   historyPageMessages: 200,
   historyMaxPages: 50,
+  components: {},
 });
 
 function clampInt(value, fallback, min, max) {

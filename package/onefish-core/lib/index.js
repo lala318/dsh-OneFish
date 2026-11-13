@@ -12,6 +12,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createCore } from './core/index.js';
 import { createDshSessionAdapter } from './core/adapters/dsh/session-adapter.js';
+import { createDshComponentBroker } from './core/adapters/dsh/component-broker.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../..');
@@ -48,6 +49,29 @@ export function apply(ctx) {
     sessionAdapter,
   });
   const disposers = [];
+
+  let componentBroker = null;
+  if (ctx.sessionController) {
+    componentBroker = createDshComponentBroker({
+      core,
+      sessionController: ctx.sessionController,
+      components: core.components,
+      logger: (...args) => core.log(...args),
+    });
+    core.components.setSubmit((componentId, envelope) => componentBroker.submit(componentId, envelope));
+  }
+
+  try {
+    if (typeof ctx.provide === 'function') {
+      const dispose = ctx.provide('onefishCore', core.componentApi);
+      if (typeof dispose === 'function') disposers.push(dispose);
+      core.log('onefishCore service 已注册');
+    } else {
+      core.log('onefishCore service 未注册：ctx.provide 不可用');
+    }
+  } catch (error) {
+    core.log(`onefishCore service 注册失败：${error?.message ?? error}`);
+  }
 
   function json(res, code, value) {
     try {
@@ -136,6 +160,7 @@ export function apply(ctx) {
       currentSession: core.session.current(),
       recentSessions: core.session.list({ limit: 8 }),
       archive: { days: core.archive.listDays().length },
+      components: core.components.list(),
       recentMemories: core.memory.list({ limit: 8 }),
     };
   }
@@ -238,6 +263,7 @@ export function apply(ctx) {
         try {
           const sessionId = session?.id || event?.sessionId || event?.session_id || '';
           if (sessionId) core.session.noteActivity(sessionId, event || {});
+          componentBroker?.handleEvent(session, event || {});
         } catch (error) {
           core.log(`会话事件处理失败：${error?.message ?? error}`);
         }

@@ -1,0 +1,19 @@
+{
+  "name": "@onefish/component-sdk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "OneFish component contract v1: manifest validation and message envelope helpers.",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node test/sdk.test.mjs"
+  },
+  "license": "MIT"
+}
