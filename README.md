@@ -17,6 +17,12 @@ OneFish/
       └─ package.json
 ```
 
+## 架构决策
+
+- [ADR-0001：Core is DSH-first](docs/adr/0001-core-is-dsh-first.md)
+- [ADR-0002：会话运行时归 DSH，生命周期归 Core](docs/adr/0002-session-ownership.md)
+- [ADR-0003：全量记忆与 memory-space 分层，日终整理](docs/adr/0003-memory-layers-and-consolidation.md)
+
 ## 安装 / 注册
 
 ```powershell
