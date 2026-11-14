@@ -41,7 +41,8 @@ try {
   assert.match(text, /昨天在重构/);
   assert.match(text, /【使用方式】/);
   assert.ok(text.length >= 200);
-  assert.ok(!text.includes('qq_send_message'), 'DSH 开机包不应带 QQ 发送协议');
+  assert.match(text, /消息可能来自 DSH 原生对话窗口或频道组件/);
+  assert.match(text, /使用当前可用的频道发送工具/);
 
   console.log('✅ 开机包测试通过');
 } finally {

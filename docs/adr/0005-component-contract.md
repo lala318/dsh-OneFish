@@ -159,15 +159,26 @@ Outbound：
 | `components/echo` | 已实现，作为契约假组件 |
 | Core component registry | 已实现 manifest / lifecycle / scoped handle |
 | `onefishCore` Cordis service | 已实现 `ctx.provide` |
-| DSH component broker | 已实现 FIFO prompt / turn 聚合 / outbound |
+| DSH component broker | 已实现 FIFO / turn 聚合 / tool admission / outbound |
+| Core 组件设置 UI | v1 不提供；组件自己管理配置 |
 | echo 安装到 live DSH | 未安装；先用单元测试验证 |
-| QQ/B站/桌宠 | 未接入 |
+| QQ/B站/桌宠 | QQ 组件已实现，待边界收口；B站/桌宠未接入 |
 
 当前 broker 是 MVP：
 
-- FIFO 假设 DSH 按顺序处理 core 提交的 prompt；
+- `auto` 模式按 FIFO 聚合 turn；
+- `tool` 模式等待 `sessionController.prompt` admission，失败 reject；
+- 不存在 `promptOwnMessage` 旁路，Core 始终拼频道/来源/用户/消息；
 - DSH 窗口用户自己发起的 turn 通过 active turn 检测忽略，但不做严格来源标记；
 - 流式输出先按 `turn/end` 批量发出，不逐 token 推送。
+
+## v1 补充（2026-11-14）
+
+- Core 不内建具体组件设置页；`components.<id>` 仍是配置命名空间，但设置由组件自己管理；
+- 组件 `submit` 在 tool 模式返回 admission 结果，失败必须 reject；
+- archive/consolidation 对 `token="..."` 等 secret 做脱敏；
+- 组件 MCP 只能拿 opaque env：`ONEFISH_COMPONENT_STATE_DIR`、`ONEFISH_COMPONENT_CONFIG_FILE`；
+- Core host / preset / boot pack 不得出现具体组件 id 特化。
 
 ## 后果
 

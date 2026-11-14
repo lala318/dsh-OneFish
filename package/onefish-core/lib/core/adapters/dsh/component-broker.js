@@ -38,7 +38,46 @@ export function createDshComponentBroker({
 } = {}) {
   const queue = [];
   let current = null;
+  let pumping = false;
   let activeSessionId = '';
+
+  function isAutoMode(item) {
+    const record = components?.get?.(item.componentId);
+    return record?.manifest?.capabilities?.channel?.outbound === 'auto';
+  }
+
+  function formatPrompt(item) {
+    const record = components?.get?.(item.componentId);
+    const extra = typeof record?.component?.renderPrompt === 'function'
+      ? record.component.renderPrompt(item.envelope)
+      : '';
+    return formatInbound(item.envelope, extra);
+  }
+
+  async function sendPrompt(item) {
+    const result = await sessionController.prompt({
+      sessionId: activeSessionId,
+      requestId: item.requestId,
+      mode: 'queue',
+      content: [{ type: 'text', text: formatPrompt(item) }],
+    });
+    if (result?.accepted === false) {
+      throw new Error(result.error || 'DSH prompt was rejected');
+    }
+    return result;
+  }
+
+  function deferred() {
+    let resolve;
+    let reject;
+    const promise = new Promise((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    // submit 的调用方会 await；这里避免无人等待时出现 unhandled rejection。
+    promise.catch(() => {});
+    return { promise, resolve, reject };
+  }
 
   function emitError(item, error) {
     const record = components?.get?.(item.componentId);
@@ -56,25 +95,46 @@ export function createDshComponentBroker({
   }
 
   async function pump() {
-    if (current || queue.length === 0) return;
-    const item = queue.shift();
-    current = item;
-    const record = components?.get?.(item.componentId);
-    const extra = typeof record?.component?.renderPrompt === 'function'
-      ? record.component.renderPrompt(item.envelope)
-      : '';
+    if (pumping || current || queue.length === 0) return;
+    pumping = true;
     try {
-      await sessionController.prompt({
-        sessionId: activeSessionId,
-        requestId: item.requestId,
-        mode: 'queue',
-        content: [{ type: 'text', text: formatInbound(item.envelope, extra) }],
-      });
-    } catch (error) {
-      logger(`组件 prompt 失败 ${item.componentId}：${error?.message ?? error}`);
-      emitError(item, error);
-      current = null;
-      pump();
+      while (!current && queue.length > 0) {
+        const item = queue[0];
+        if (!isAutoMode(item)) {
+          // tool 模式不需要在 Core 侧等 turn/end 聚合 assistant 文本。
+          // 立即交给 DSH，让 DSH 自己排队；否则一个丢失的 turn 事件就会
+          // 把后续 QQ 消息永久卡在 Core 队列里。
+          queue.shift();
+          try {
+            await sendPrompt(item);
+            item.admission?.resolve({
+              requestId: item.requestId,
+              sessionId: activeSessionId,
+              accepted: true,
+              queued: false,
+            });
+          } catch (error) {
+            logger(`组件 prompt 失败 ${item.componentId}：${error?.message ?? error}`);
+            item.admission?.reject(error);
+          }
+          continue;
+        }
+
+        // auto 模式保留“一次一个 turn”的聚合语义。
+        queue.shift();
+        current = item;
+        try {
+          await sendPrompt(item);
+        } catch (error) {
+          logger(`组件 prompt 失败 ${item.componentId}：${error?.message ?? error}`);
+          emitError(item, error);
+          current = null;
+        }
+        if (current) return;
+      }
+    } finally {
+      pumping = false;
+      if (!current && queue.length > 0) queueMicrotask(() => { void pump(); });
     }
   }
 
@@ -90,9 +150,12 @@ export function createDshComponentBroker({
       text: '',
       turnId: '',
       started: false,
+      admission: null,
     };
+    if (!isAutoMode(item)) item.admission = deferred();
     queue.push(item);
     pump().catch((error) => logger(`组件队列失败：${error?.message ?? error}`));
+    if (item.admission) return item.admission.promise;
     return { requestId: item.requestId, sessionId: activeSessionId, queued: true };
   }
 

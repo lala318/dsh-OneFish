@@ -3,6 +3,8 @@
  *
  * Core 只认这里的抽象；DSH 版本变化时改这一层，不改 day/session/archive 规则。
  */
+import { randomUUID } from 'node:crypto';
+
 export function createDshSessionAdapter({
   sessionController,
   workspaceRegistry = null,
@@ -93,12 +95,38 @@ export function createDshSessionAdapter({
     if (!sessions || typeof sessions.get !== 'function') throw new Error('sessions service is not available');
     const session = sessions.get(sessionId);
     if (!session || typeof session.append !== 'function') throw new Error(`session not found: ${sessionId}`);
+    // 开机包只属于“新会话第一轮之前”。已有对话事件的会话（尤其是用户在 DSH 里
+    // 手动创建的 91c）不能再塞 developer/message，否则会打乱 turn 边界。
+    let hasDialogue = false;
+    let hasSnapshot = false;
+    try {
+      if (typeof session.snapshotEvents === 'function') {
+        hasSnapshot = true;
+        hasDialogue = session.snapshotEvents().some((event) => (
+          event?.type === 'turn/start'
+          || event?.type === 'user/message'
+          || event?.type === 'assistant/message'
+        ));
+      }
+    } catch {}
+    if (!hasSnapshot) {
+      const seq = Number(session.seq);
+      if (Number.isSafeInteger(seq) && seq > 0) hasDialogue = true;
+    }
+    if (hasDialogue) return { seq: null, skipped: true };
     const event = session.append(
       'developer/message',
       {
+        // DSH v4 developer/message 是带 turn/step 的会话事件；缺字段会让整个 session
+        // 落入格式错误（"turn must be a non-negative safe integer"）。
+        turn: 1,
+        step: 1,
         message: {
+          // DSH v4 developer message 必须是完整消息：id + producer-owned source。
+          id: randomUUID(),
           role: 'developer',
           content: [{ type: 'text', text: String(text) }],
+          source: { kind: 'onefish-core' },
         },
       },
       { surfaceOp: 'append' },

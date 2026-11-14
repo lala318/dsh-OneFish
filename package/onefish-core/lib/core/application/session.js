@@ -119,7 +119,11 @@ export function createSessionService({
     if (!bootPack || !adapter || typeof adapter.injectContext !== 'function') return entry;
     try {
       const text = bootPack.build({ day: entry.day, workspace: entry });
-      await adapter.injectContext(entry.sessionId, text);
+      const injected = await adapter.injectContext(entry.sessionId, text);
+      if (injected?.skipped) {
+        logger(`开机包跳过：${entry.sessionId} 已有事件，不向会话中部注入`);
+        return { ...entry, bootPackAt: now(), bootPackChars: 0 };
+      }
       logger(`开机包已注入：${entry.day} / ${entry.sessionId}（${text.length} 字）`);
       return { ...entry, bootPackAt: now(), bootPackChars: text.length };
     } catch (error) {

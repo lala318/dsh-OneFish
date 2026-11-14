@@ -6,7 +6,7 @@
  *   2. 暴露最小设置页 API；
  *   3. 订阅 DSH 会话事件，更新日会话活跃时间。
  *
- * 不加载 QQ / B站 / 桌宠；那些以后作为可选组件接入。
+ * 不加载具体频道组件；那些以后作为可选组件接入。
  */
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -21,6 +21,18 @@ const VERSION = '0.1.0';
 
 export const name = 'onefish-core';
 export const inject = ['webServer', 'connection', 'sessionController'];
+
+/**
+ * DSH 0.2.x 的 sessionController.prompt(request, signal) 要求显式 AbortSignal；
+ * Core broker 只传 request 会得到 "Cannot read properties of undefined (reading 'throwIfAborted')"。
+ * 在宿主边界补一个 admission 超时信号，不改 lib/core/**。
+ */
+export function createBrokerSessionController(sessionController, { timeoutMs = 120_000 } = {}) {
+  if (!sessionController) return null;
+  return {
+    prompt: (request) => sessionController.prompt(request, AbortSignal.timeout(Math.max(1000, Number(timeoutMs) || 120_000))),
+  };
+}
 
 export function apply(ctx) {
   let sessionAdapter = null;
@@ -54,11 +66,12 @@ export function apply(ctx) {
   if (ctx.sessionController) {
     componentBroker = createDshComponentBroker({
       core,
-      sessionController: ctx.sessionController,
+      sessionController: createBrokerSessionController(ctx.sessionController),
       components: core.components,
       logger: (...args) => core.log(...args),
     });
     core.components.setSubmit((componentId, envelope) => componentBroker.submit(componentId, envelope));
+    core.log('组件 broker 已启用（DSH prompt AbortSignal 适配）');
   }
 
   try {

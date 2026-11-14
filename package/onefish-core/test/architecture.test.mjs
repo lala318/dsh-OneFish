@@ -10,6 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const root = path.resolve(import.meta.dirname, '..');
+const packageRoot = root;
 const core = path.join(root, 'lib', 'core');
 const domain = path.join(core, 'domain');
 const application = path.join(core, 'application');
@@ -28,6 +29,15 @@ for (const name of domainFiles) {
   assert.doesNotMatch(source, /from ['"]node:path['"]/, `${name} 不应 import node:path`);
   assert.doesNotMatch(source, /@deepseek-ai|mcp__|\.\.\/adapters/, `${name} 不应依赖 DSH/MCP/adapters`);
 }
+
+const hostFiles = ['index.js', 'client.js'];
+for (const name of hostFiles) {
+  const source = fs.readFileSync(path.join(packageRoot, 'lib', name), 'utf8');
+  assert.doesNotMatch(source, /\bqq\b|QQ|component-config|components\/qq/i, `${name} 不应出现具体组件特化`);
+}
+
+const presetSource = fs.readFileSync(path.join(packageRoot, 'presets', 'onefish-core.patch.yml'), 'utf8');
+assert.doesNotMatch(presetSource, /\bQQ\b|\bqq_send_message\b|\bonefish-qq\b/, 'preset 不应写死 QQ 组件');
 
 const applicationFiles = fs.readdirSync(application).filter((name) => name.endsWith('.js'));
 assert.ok(applicationFiles.length >= 4);

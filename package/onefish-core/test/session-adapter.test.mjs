@@ -108,7 +108,11 @@ const injected = await adapter.injectContext('session-adapter-1', '【OneFish �
 assert.equal(injected.seq, 42);
 assert.equal(calls.append.length, 1);
 assert.equal(calls.append[0].type, 'developer/message');
+assert.equal(calls.append[0].data.turn, 1);
+assert.equal(calls.append[0].data.step, 1);
+assert.match(calls.append[0].data.message.id, /^[0-9a-f-]{36}$/);
 assert.equal(calls.append[0].data.message.role, 'developer');
+assert.deepEqual(calls.append[0].data.message.source, { kind: 'onefish-core' });
 assert.equal(calls.append[0].data.message.content[0].text, '【OneFish 开机包】');
 assert.deepEqual(calls.append[0].opts, { surfaceOp: 'append' });
 

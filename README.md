@@ -23,8 +23,9 @@ OneFish/
 │     └─ package.json
 ├─ packages/
 │  └─ component-sdk/       # 组件契约 v1
-└─ components/
-   └─ echo/                # 契约假组件
+├─ components/
+│  ├─ echo/                # 契约假组件
+│  └─ qq/                  # QQ / SnowLuma 组件 + qq_* MCP
 ```
 
 ## 架构决策
@@ -74,4 +75,4 @@ cd $env:USERPROFILE\.dsh\OneFish\package\onefish-core
 npm test
 ```
 
-当前只包含 Core MVP：人格 / 记忆 / DSH 对话窗口。QQ、B站、桌宠后续作为可选组件接入。
+当前包含 Core MVP：人格 / 记忆 / 日会话，以及可选的 QQ 组件（SnowLuma）。组件配置由组件自己的安装/配置流程管理；Core 不内建组件设置页。

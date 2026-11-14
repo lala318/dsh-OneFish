@@ -5,6 +5,7 @@
  * 日摘要只是索引。后续的 memory-space 提炼可以在这个结果上再做。
  */
 import { createHash } from 'node:crypto';
+import { redactSecrets } from './redaction.js';
 
 function isObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -45,14 +46,15 @@ export function normalizeRecord(record) {
   const type = String(event.type || '');
   if (type !== 'user/message' && type !== 'assistant/message') return null;
   const { role, text } = messageOf(event);
-  if (!text) return null;
+  const safeText = redactSecrets(text);
+  if (!safeText) return null;
   const rawAt = event.at ?? event.time ?? event.timestamp ?? event.data?.at ?? 0;
   const at = typeof rawAt === 'string' ? (Date.parse(rawAt) || 0) : (Number(rawAt) || 0);
   return {
     seq: Number(event.seq ?? 0),
     type,
     role,
-    text,
+    text: safeText,
     at,
   };
 }
@@ -99,12 +101,12 @@ export function buildDigest({ day, sessionId = '', messages = [], sourceHash: ha
   ];
   if (users.length) {
     lines.push('## 用户', '');
-    for (const m of users.slice(0, 80)) lines.push(`- ${clip(m.text)}`);
+    for (const m of users.slice(0, 80)) lines.push(`- ${clip(redactSecrets(m.text))}`);
     lines.push('');
   }
   if (assistants.length) {
     lines.push('## 助手', '');
-    for (const m of assistants.slice(0, 80)) lines.push(`- ${clip(m.text)}`);
+    for (const m of assistants.slice(0, 80)) lines.push(`- ${clip(redactSecrets(m.text))}`);
     lines.push('');
   }
   return lines.join('\n');

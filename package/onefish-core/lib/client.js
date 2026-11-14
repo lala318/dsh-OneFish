@@ -144,7 +144,7 @@ window.__ModuleLoader__.load({
             h("div", { style: card }, h("div", { style: { fontWeight: 600, marginBottom: "6px" } }, "会话"), row("今日", overview.session?.currentDay || "—"), row("工作区", overview.session?.workspaceTitle || "—"), row("开机包", overview.session?.bootPackAt ? "已注入" : "未注入"), row("状态", overview.session?.active ? "active" : "未建立")),
             h("div", { style: card }, h("div", { style: { fontWeight: 600, marginBottom: "6px" } }, "记忆层级"), row("core", overview.memory?.core || 0), row("active", overview.memory?.active || 0), row("knowledge", overview.memory?.knowledge || 0))),
           h("div", { style: { marginTop: "12px", fontSize: "12px", color: "var(--dsw-alias-label-tertiary)", lineHeight: "18px" } },
-            "这是最小核心：只含记忆/人格/日会话，不加载 QQ、B站、桌宠。QQ/B站/桌宠后续作为组件接入。"));
+            "这是最小核心：只含记忆/人格/日会话，不加载具体频道组件。频道组件后续作为可选组件接入。"));
       }
 
       function renderPersona() {

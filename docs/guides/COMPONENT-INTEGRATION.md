@@ -222,11 +222,43 @@ const envelope = createInbound({
 await scope.session.submit(envelope);
 ```
 
-`submit` 只表示**已进入 Core 队列**，不表示 DSH 已经回复：
+`submit` 的返回语义按 delivery 不同：
+
+- `auto`：进入 Core 队列即返回，后续通过 outbound 交付：
 
 ```js
 { requestId, sessionId, queued: true }
 ```
+
+- `tool`：等待 DSH prompt admission，成功后才返回：
+
+```js
+{ requestId, sessionId, accepted: true, queued: false }
+```
+
+`tool` admission 失败时 `submit` 会 reject。组件只有在 `submit` 成功后才能把消息记为已处理；失败必须回滚或允许重试。
+
+### renderPrompt
+
+`renderPrompt(envelope)` 只返回**附加块（body）**，不能替换 Core 的信封：
+
+```js
+renderPrompt(envelope) {
+  return `【频道】${envelope.channelKey}`;
+}
+```
+
+Core 始终负责：
+
+```text
+【频道】componentId / channelKey
+【来源】componentId
+【用户】...
+【组件上下文】renderPrompt 的返回值
+【消息】envelope.text
+```
+
+不存在 `meta.promptOwnMessage` 之类的 Core 旁路。
 
 ## 8. 出站信封
 
@@ -260,7 +292,8 @@ MVP 在 `turn/end` 批量发出，不做逐 token 流式。
 ## 10. 会话与并发
 
 - 所有组件共享当天一个 DSH 日会话；
-- Core 内部 FIFO：同一时间只允许一个 active turn；
+- `auto` 模式 Core 内部 FIFO：同一时间只允许一个 active turn；
+- `tool` 模式 Core 只按顺序等待 DSH prompt admission，不等待 turn/end；
 - `submit` 可能排队，组件不要假设立即开始；
 - 一个 `requestId` 只能对应一次提交；
 - `tool` 模式组件必须自己保证工具调用幂等，Core 不替它去重；
@@ -290,7 +323,16 @@ v1 的 `scope.config` 是只读快照，来自：
   components.<id>
 ```
 
-需要写配置时，由 Core 设置页或后续 config API 处理；组件不要直接改 `config.json`。
+v1 Core **不提供组件设置页**。组件自己管理配置/设置 UI；需要写配置时由组件自己的安装/配置流程处理，不要直接改 `config.json`。
+
+MCP 进程拿不到 scoped handle 时，只能使用 Core/安装脚本传入的 opaque 路径：
+
+```text
+ONEFISH_COMPONENT_STATE_DIR
+ONEFISH_COMPONENT_CONFIG_FILE
+```
+
+不要自己推导 Core home，也不要默认读 `core/config.json`；缺失时 fail closed。
 
 ## 12. 版本和隔离
 

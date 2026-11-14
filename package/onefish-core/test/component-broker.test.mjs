@@ -54,4 +54,91 @@ broker.handleEvent({ id: 's1' }, { type: 'turn/start', data: { turnId: 't2' } })
 broker.handleEvent({ id: 's1' }, { type: 'turn/end' });
 assert.equal(outbound.length, 2);
 
+// tool 模式：submit 等待 DSH admission，成功后才返回 accepted。
+const toolPrompts = [];
+const toolBroker = createDshComponentBroker({
+  core,
+  sessionController: {
+    async prompt(request) {
+      toolPrompts.push(request);
+      return { accepted: true };
+    },
+  },
+  components: {
+    get(id) {
+      return id === 'qq' ? {
+        manifest: { id: 'qq', capabilities: { channel: { outbound: 'tool' } } },
+        component: { renderPrompt: (envelope) => `qq:${envelope.channelKey}` },
+      } : null;
+    },
+    emitOutbound() {},
+  },
+});
+const q1 = await toolBroker.submit('qq', { channelKey: 'private:1', requestId: 'q1', text: '第一条' });
+const q2 = await toolBroker.submit('qq', { channelKey: 'private:1', requestId: 'q2', text: '第二条' });
+assert.equal(q1.accepted, true);
+assert.equal(q2.accepted, true);
+assert.equal(toolPrompts.length, 2);
+assert.equal(toolPrompts[0].requestId, 'q1');
+assert.equal(toolPrompts[1].requestId, 'q2');
+
+// tool 模式 prompt 失败必须 reject，不能静默接受。
+let failNext = true;
+const failBroker = createDshComponentBroker({
+  core,
+  sessionController: {
+    async prompt() {
+      if (failNext) throw new Error('prompt rejected');
+      return { accepted: true };
+    },
+  },
+  components: {
+    get(id) {
+      return id === 'qq' ? {
+        manifest: { id: 'qq', capabilities: { channel: { outbound: 'tool' } } },
+        component: {},
+      } : null;
+    },
+    emitOutbound() {},
+  },
+});
+await assert.rejects(
+  () => failBroker.submit('qq', { channelKey: 'private:1', requestId: 'fail-1', text: '会失败' }),
+  /prompt rejected/,
+);
+failNext = false;
+const recovered = await failBroker.submit('qq', { channelKey: 'private:1', requestId: 'retry-1', text: '重试' });
+assert.equal(recovered.accepted, true);
+
+// 组件 body 只能作为附加块；Core 始终保留频道/来源/用户/消息。
+const compactPrompts = [];
+const compactBroker = createDshComponentBroker({
+  core,
+  sessionController: {
+    async prompt(request) {
+      compactPrompts.push(request);
+      return { accepted: true };
+    },
+  },
+  components: {
+    get(id) {
+      return id === 'qq' ? {
+        manifest: { id: 'qq', capabilities: { channel: { outbound: 'tool' } } },
+        component: { renderPrompt: () => '【QQ 私聊 1｜未读 1】' },
+      } : null;
+    },
+    emitOutbound() {},
+  },
+});
+await compactBroker.submit('qq', {
+  channelKey: 'private:1',
+  requestId: 'compact-1',
+  text: 'hi',
+  meta: { promptOwnMessage: true },
+});
+assert.match(compactPrompts[0].content[0].text, /【频道】private:1/);
+assert.match(compactPrompts[0].content[0].text, /【来源】qq/);
+assert.match(compactPrompts[0].content[0].text, /【QQ 私聊 1｜未读 1】/);
+assert.match(compactPrompts[0].content[0].text, /【消息】hi/);
+
 console.log('✅ 组件消息 broker 测试通过');

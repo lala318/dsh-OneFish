@@ -47,7 +47,8 @@ export function createBootPackService({ persona, memory, archive, config = DEFAU
 
     blocks.push([
       '【使用方式】',
-      '- 你在 DSH 原生对话窗口里，文本会直接显示；不要调用 QQ/B站/桌宠的发送工具。',
+      '- 消息可能来自 DSH 原生对话窗口或频道组件；以消息里的【频道】和组件提供的上下文为准。',
+      '- 来自 DSH 窗口时，文本直接显示；来自频道时，使用当前可用的频道发送工具，不要把回复只写在 DSH 窗口。',
       '- 人格卡、核心记忆和主动记忆已经在本开机包里；不需要每轮重复调用 persona_get。',
       '- 需要更多记忆时用 mcp__onefish-core__memory_search；全量历史用 mcp__onefish-core__memory_archive_search。',
       '- 写/改/删记忆用 mcp__onefish-core__memory_add / memory_update / memory_delete；列表用 memory_list。',
