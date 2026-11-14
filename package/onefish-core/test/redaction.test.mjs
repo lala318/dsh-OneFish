@@ -16,6 +16,14 @@ assert.equal(hasSecret(legacy), true);
 assert.equal(redactSecrets(legacy).includes('KVPm1ZxQIJOSRBYAm9KqvUHj'), false);
 assert.match(redactSecrets(legacy), /【发送令牌】\[redacted\]/);
 
+const jsonToken = '{"token": "KVPm1ZxQIJOSRBYAm9KqvUHj"}';
+assert.equal(hasSecret(jsonToken), true);
+assert.equal(redactSecrets(jsonToken).includes('KVPm1ZxQIJOSRBYAm9KqvUHj'), false);
+
+const escapedJsonToken = '{\\"token\\": \\"KVPm1ZxQIJOSRBYAm9KqvUHj\\"}';
+assert.equal(hasSecret(escapedJsonToken), true);
+assert.equal(redactSecrets(escapedJsonToken).includes('KVPm1ZxQIJOSRBYAm9KqvUHj'), false);
+
 const message = normalizeRecord({
   event: {
     type: 'user/message',

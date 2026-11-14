@@ -9,6 +9,7 @@ const PATTERNS = [
   /(\btoken\s*=\s*)(?!\[redacted\])([A-Za-z0-9._~+\/=-]{16,})/gi,
   /(\b(?:accessToken|wsAccessToken|sendToken|apiKey|api_key|secret)\s*[:=]\s*")(?!\[redacted\])([^"\r\n]{8,})(")/gi,
   /(\b(?:accessToken|wsAccessToken|sendToken|apiKey|api_key|secret)\s*[:=]\s*')(?!\[redacted\])([^'\r\n]{8,})(')/gi,
+  /(\btoken\b[\\"'\s]*:[\\"'\s]*)(?!\[redacted\])([A-Za-z0-9._~+\/=-]{8,})/gi,
   /(【发送令牌】[^\S\r\n]*)(?!\[redacted\])([A-Za-z0-9_-]{8,})/g,
 ];
 
