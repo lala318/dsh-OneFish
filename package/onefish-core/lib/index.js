@@ -276,6 +276,10 @@ export function apply(ctx) {
         try {
           const sessionId = session?.id || event?.sessionId || event?.session_id || '';
           if (sessionId) core.session.noteActivity(sessionId, event || {});
+          if (sessionId) {
+            Promise.resolve(core.session.handleEvent(sessionId, event || {}))
+              .catch((error) => core.log(`开机包事件处理失败：${error?.message ?? error}`));
+          }
           componentBroker?.handleEvent(session, event || {});
         } catch (error) {
           core.log(`会话事件处理失败：${error?.message ?? error}`);

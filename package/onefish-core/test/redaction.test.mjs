@@ -11,6 +11,11 @@ assert.equal(hasSecret(raw), true);
 assert.equal(redactSecrets(raw).includes('abcdefgh12345678'), false);
 assert.match(redactSecrets(raw), /token="\[redacted\]"/);
 
+const legacy = '【发送令牌】KVPm1ZxQIJOSRBYAm9KqvUHj';
+assert.equal(hasSecret(legacy), true);
+assert.equal(redactSecrets(legacy).includes('KVPm1ZxQIJOSRBYAm9KqvUHj'), false);
+assert.match(redactSecrets(legacy), /【发送令牌】\[redacted\]/);
+
 const message = normalizeRecord({
   event: {
     type: 'user/message',

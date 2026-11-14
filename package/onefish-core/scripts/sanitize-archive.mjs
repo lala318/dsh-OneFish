@@ -61,8 +61,8 @@ function sanitizeJsonl(text, file) {
 }
 
 function sanitizeMarkdown(text) {
-  if (!hasSecret(text)) return { text, changed: 0 };
-  return { text: redactSecrets(text), changed: 1 };
+  const next = redactSecrets(text);
+  return { text: next, changed: next !== text ? 1 : 0 };
 }
 
 function writeAtomic(file, text) {

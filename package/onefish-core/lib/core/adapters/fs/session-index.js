@@ -41,6 +41,11 @@ function normalizeEntry(entry) {
     workspacePath: String(entry.workspacePath || ''),
     bootPackAt: Number(entry.bootPackAt || 0),
     bootPackChars: Number(entry.bootPackChars || 0),
+    bootPackStatus: ['pending', 'injecting', 'injected', 'skipped', 'failed'].includes(entry.bootPackStatus)
+      ? entry.bootPackStatus
+      : (Number(entry.bootPackAt || 0) > 0 ? 'injected' : ''),
+    bootPackError: typeof entry.bootPackError === 'string' ? entry.bootPackError : '',
+    workspaceAttached: entry.workspaceAttached !== false,
     createdAt: Number(entry.createdAt || 0),
     sealedAt: Number(entry.sealedAt || 0),
     lastActivityAt: Number(entry.lastActivityAt || 0),

@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { createDshSessionAdapter } from '../lib/core/adapters/dsh/session-adapter.js';
 
-const calls = { create: [], rename: [], events: [], archive: [], workspaceCreate: [], append: [] };
+const calls = { create: [], rename: [], events: [], archive: [], workspaceCreate: [], append: [], attach: [] };
 const sessions = {
   get(sessionId) {
     return {
@@ -59,7 +59,12 @@ const workspaceRegistry = {
       id: 'workspace-onefish',
       path,
       title,
+      sessionIds: [],
       async setTitle(next) { this.title = next; },
+      async attachSession(sessionId) {
+        calls.attach.push(sessionId);
+        if (!this.sessionIds.includes(sessionId)) this.sessionIds.unshift(sessionId);
+      },
     };
     return workspace;
   },
@@ -90,8 +95,15 @@ const created = await adapter.createDaily({
   day: '2026-11-13',
   workspaceId: 'workspace-onefish',
 });
-assert.deepEqual(created, { sessionId: 'session-adapter-1', preset: 'onefish-core' });
+assert.deepEqual(created, {
+  sessionId: 'session-adapter-1',
+  preset: 'onefish-core',
+  workspaceAttached: true,
+  workspaceAttachError: '',
+});
 assert.deepEqual(calls.create, [{ agentPreset: 'onefish-core', workspaceId: 'workspace-onefish' }]);
+assert.deepEqual(calls.attach, ['session-adapter-1']);
+assert.ok(workspace.sessionIds.includes('session-adapter-1'));
 assert.deepEqual(calls.rename, [{ sessionId: 'session-adapter-1', title: 'OneFish 2026-11-13' }]);
 
 const records = await adapter.history('session-adapter-1');
@@ -104,16 +116,20 @@ assert.equal(calls.events[0].address.sessionId, 'session-adapter-1');
 await adapter.archive('session-adapter-1');
 assert.deepEqual(calls.archive, [{ sessionId: 'session-adapter-1', options: { stopActivity: true } }]);
 
-const injected = await adapter.injectContext('session-adapter-1', '【OneFish 开机包】');
+const injected = await adapter.injectContext('session-adapter-1', '【OneFish 开机包】', { turn: 2, step: 3 });
 assert.equal(injected.seq, 42);
 assert.equal(calls.append.length, 1);
 assert.equal(calls.append[0].type, 'developer/message');
-assert.equal(calls.append[0].data.turn, 1);
-assert.equal(calls.append[0].data.step, 1);
+assert.equal(calls.append[0].data.turn, 2);
+assert.equal(calls.append[0].data.step, 3);
 assert.match(calls.append[0].data.message.id, /^[0-9a-f-]{36}$/);
 assert.equal(calls.append[0].data.message.role, 'developer');
 assert.deepEqual(calls.append[0].data.message.source, { kind: 'onefish-core' });
 assert.equal(calls.append[0].data.message.content[0].text, '【OneFish 开机包】');
 assert.deepEqual(calls.append[0].opts, { surfaceOp: 'append' });
+
+const skipped = await adapter.injectContext('session-adapter-1', 'no open turn');
+assert.equal(skipped.skipped, true);
+assert.equal(calls.append.length, 1);
 
 console.log('✅ DSH 会话适配层测试通过');

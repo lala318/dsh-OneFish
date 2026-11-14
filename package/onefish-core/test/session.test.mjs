@@ -26,10 +26,16 @@ const adapter = {
   async createDaily({ preset, day, workspaceId }) {
     this.createCount += 1;
     this.lastWorkspaceId = workspaceId;
-    return { sessionId: `session-test-${this.createCount}`, preset: preset || 'onefish-core', day };
+    return {
+      sessionId: `session-test-${this.createCount}`,
+      preset: preset || 'onefish-core',
+      day,
+      workspaceAttached: Boolean(workspaceId),
+      workspaceAttachError: '',
+    };
   },
-  async injectContext(sessionId, text) {
-    this.injected.push({ sessionId, text });
+  async injectContext(sessionId, text, options = {}) {
+    this.injected.push({ sessionId, text, options });
     return { seq: this.injected.length };
   },
   async history() {
@@ -68,8 +74,19 @@ try {
   assert.equal(first.workspaceTitle, 'onefish');
   assert.equal(adapter.lastWorkspaceId, 'workspace-onefish');
   assert.equal(adapter.workspaceCalls, 1);
-  assert.ok(first.bootPackAt > 0, '新会话应注入开机包');
+  assert.equal(first.bootPackAt, 0, '开机包应等待第一个 open turn/step');
+  assert.equal(first.bootPackStatus, 'pending');
+  assert.equal(adapter.injected.length, 0);
+
+  const injected = await core.session.handleEvent('session-test-1', {
+    type: 'step/start',
+    data: { turn: 1, step: 1 },
+  });
+  assert.ok(injected.bootPackAt > 0);
+  assert.equal(injected.bootPackStatus, 'injected');
   assert.equal(adapter.injected.length, 1);
+  assert.equal(adapter.injected[0].options.turn, 1);
+  assert.equal(adapter.injected[0].options.step, 1);
   assert.match(adapter.injected[0].text, /【OneFish 开机包】2026-11-13/);
   assert.match(adapter.injected[0].text, /我是测试核心/);
   assert.match(adapter.injected[0].text, /近期偏好是简洁/);
@@ -93,9 +110,15 @@ try {
   const second = await core.session.ensureToday();
   assert.equal(second.day, '2026-11-14');
   assert.equal(second.sessionId, 'session-test-2');
-  assert.ok(second.bootPackAt > 0, '新一天也应注入开机包');
+  assert.equal(second.bootPackStatus, 'pending');
+  assert.equal(adapter.injected.length, 1);
+  await core.session.handleEvent('session-test-2', {
+    type: 'step/start',
+    data: { turn: 1, step: 1 },
+  });
   assert.equal(adapter.injected.length, 2);
   assert.match(adapter.injected[1].text, /【OneFish 开机包】2026-11-14/);
+  assert.equal(core.session.stats().pending, 1);
   assert.equal(adapter.createCount, 2);
   assert.equal(core.session.stats().pending, 1);
   assert.equal(core.session.status().recent.find((item) => item.day === '2026-11-13').status, 'pending');

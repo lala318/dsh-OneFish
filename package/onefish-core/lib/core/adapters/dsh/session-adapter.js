@@ -16,10 +16,11 @@ export function createDshSessionAdapter({
   if (!sessionController) throw new Error('sessionController is not available');
 
   let workspaceCache = null;
+  let workspaceEntity = null;
 
   async function ensureWorkspace({ path, title } = {}) {
     if (!path || !workspaceRegistry) return null;
-    if (workspaceCache && workspaceCache.path === path && workspaceCache.title === title) return workspaceCache;
+    if (workspaceCache && workspaceCache.path === path && workspaceCache.title === title && workspaceEntity) return workspaceCache;
     let workspace = null;
     if (typeof workspaceRegistry.resolveByPath === 'function') {
       workspace = await workspaceRegistry.resolveByPath(path);
@@ -32,6 +33,7 @@ export function createDshSessionAdapter({
       await workspace.setTitle(title);
       if (typeof workspaceRegistry.get === 'function') workspace = workspaceRegistry.get(workspace.id) || workspace;
     }
+    workspaceEntity = workspace;
     workspaceCache = {
       workspaceId: String(workspace.id || ''),
       workspaceTitle: String(workspace.title || title || ''),
@@ -39,6 +41,47 @@ export function createDshSessionAdapter({
     };
     logger(`DSH workspace 已就绪：${workspaceCache.workspaceTitle} (${workspaceCache.workspaceId})`);
     return workspaceCache;
+  }
+
+  async function resolveWorkspace({ workspaceId, path } = {}) {
+    if (workspaceEntity && (!workspaceId || String(workspaceEntity.id) === String(workspaceId))) return workspaceEntity;
+    if (workspaceId && workspaceRegistry && typeof workspaceRegistry.get === 'function') {
+      const found = workspaceRegistry.get(workspaceId);
+      if (found) return found;
+    }
+    if (path && workspaceRegistry && typeof workspaceRegistry.resolveByPath === 'function') {
+      const found = await workspaceRegistry.resolveByPath(path);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  /**
+   * 创建后确认会话确实被 workspace 记账；sessionIds 是 DSH UI 的归属依据，
+   * 不能只相信 create({ workspaceId }) 的返回值。
+   */
+  async function attachWorkspace(sessionId, { workspaceId = '', path = '' } = {}) {
+    if (!workspaceRegistry) return { attached: false, skipped: true, reason: 'workspaceRegistry unavailable' };
+    const workspace = await resolveWorkspace({ workspaceId, path });
+    if (!workspace) return { attached: false, skipped: false, error: `workspace not found: ${workspaceId || path || '(empty)'}` };
+    const before = Array.isArray(workspace.sessionIds) ? workspace.sessionIds : [];
+    if (!before.includes(sessionId)) {
+      if (typeof workspace.attachSession !== 'function') {
+        return { attached: false, skipped: false, error: `workspace ${workspace.id} has no attachSession` };
+      }
+      await workspace.attachSession(sessionId);
+    }
+    const after = Array.isArray(workspace.sessionIds) ? workspace.sessionIds : [];
+    if (!after.includes(sessionId)) {
+      return { attached: false, skipped: false, error: `workspace ${workspace.id} did not retain ${sessionId}` };
+    }
+    return {
+      attached: true,
+      skipped: false,
+      workspaceId: String(workspace.id || workspaceId || ''),
+      workspaceTitle: String(workspace.title || ''),
+      workspacePath: String(workspace.path || path || ''),
+    };
   }
 
   async function createDaily({ preset, title, day, workspaceId, cwd } = {}) {
@@ -49,6 +92,17 @@ export function createDshSessionAdapter({
     });
     const sessionId = String(created?.sessionId || '').trim();
     if (!sessionId) throw new Error('sessionController.create returned no sessionId');
+    let attached = { attached: false, skipped: true, reason: 'no workspace' };
+    if (workspaceId || cwd) {
+      try {
+        attached = await attachWorkspace(sessionId, { workspaceId, path: cwd });
+        if (attached.error) logger(`日会话 workspace attach 失败 ${sessionId}：${attached.error}`);
+        else if (attached.attached) logger(`日会话已加入 workspace：${sessionId} -> ${attached.workspaceId}`);
+      } catch (error) {
+        attached = { attached: false, skipped: false, error: String(error?.message ?? error) };
+        logger(`日会话 workspace attach 异常 ${sessionId}：${attached.error}`);
+      }
+    }
     if (title && typeof sessionController.rename === 'function') {
       try {
         await sessionController.rename({ sessionId, title });
@@ -57,7 +111,12 @@ export function createDshSessionAdapter({
       }
     }
     logger(`DSH 日会话已创建：${day || ''} ${sessionId}${workspaceId ? ` @ ${workspaceId}` : ''}`);
-    return { sessionId, preset: String(created?.agentPreset || preset || '') };
+    return {
+      sessionId,
+      preset: String(created?.agentPreset || preset || ''),
+      workspaceAttached: attached.attached === true,
+      workspaceAttachError: attached.error || '',
+    };
   }
 
   async function history(sessionId) {
@@ -89,38 +148,27 @@ export function createDshSessionAdapter({
     logger(`DSH 会话已归档：${sessionId}`);
   }
 
-  /** 把开机包作为 developer/message 注入日会话；不产生 user turn。 */
-  async function injectContext(sessionId, text) {
+  /**
+   * 把开机包作为 developer/message 注入日会话；不产生 user turn。
+   *
+   * DSH v4 要求 developer/message 匹配一个已经打开的 turn/step。这里不再
+   * 猜 turn=1/step=1；没有显式 open turn/step 时安全跳过，由调用方记录。
+   */
+  async function injectContext(sessionId, text, { turn, step } = {}) {
     if (!text || !String(text).trim()) throw new Error('boot pack text is empty');
+    const turnNo = Number(turn);
+    const stepNo = Number(step);
+    if (!Number.isSafeInteger(turnNo) || turnNo < 0 || !Number.isSafeInteger(stepNo) || stepNo < 0) {
+      return { seq: null, skipped: true, reason: 'no open turn/step' };
+    }
     if (!sessions || typeof sessions.get !== 'function') throw new Error('sessions service is not available');
     const session = sessions.get(sessionId);
     if (!session || typeof session.append !== 'function') throw new Error(`session not found: ${sessionId}`);
-    // 开机包只属于“新会话第一轮之前”。已有对话事件的会话（尤其是用户在 DSH 里
-    // 手动创建的 91c）不能再塞 developer/message，否则会打乱 turn 边界。
-    let hasDialogue = false;
-    let hasSnapshot = false;
-    try {
-      if (typeof session.snapshotEvents === 'function') {
-        hasSnapshot = true;
-        hasDialogue = session.snapshotEvents().some((event) => (
-          event?.type === 'turn/start'
-          || event?.type === 'user/message'
-          || event?.type === 'assistant/message'
-        ));
-      }
-    } catch {}
-    if (!hasSnapshot) {
-      const seq = Number(session.seq);
-      if (Number.isSafeInteger(seq) && seq > 0) hasDialogue = true;
-    }
-    if (hasDialogue) return { seq: null, skipped: true };
     const event = session.append(
       'developer/message',
       {
-        // DSH v4 developer/message 是带 turn/step 的会话事件；缺字段会让整个 session
-        // 落入格式错误（"turn must be a non-negative safe integer"）。
-        turn: 1,
-        step: 1,
+        turn: turnNo,
+        step: stepNo,
         message: {
           // DSH v4 developer message 必须是完整消息：id + producer-owned source。
           id: randomUUID(),
@@ -134,5 +182,5 @@ export function createDshSessionAdapter({
     return { seq: event?.seq ?? null };
   }
 
-  return { ensureWorkspace, createDaily, history, archive, injectContext };
+  return { ensureWorkspace, attachWorkspace, createDaily, history, archive, injectContext };
 }

@@ -57,7 +57,7 @@ DSH 拥有消息历史、上下文和会话 UI；Core 只管理日会话：
 - 逻辑日默认 **04:00**（可在 `core/config.json` 改 `rolloverHour`）；
 - 日会话放在专用 DSH workspace：默认标题 `onefish`，路径 `~/.dsh/OneFish`；
 - 当天首次需要会话时创建 `onefish-core` preset 的 DSH session；
-- 创建后注入**开机包**（`developer/message`，不产生 user turn）：core 全量记忆、人格卡、active 记忆、昨日摘要/近期档案、DSH 使用说明；
+- 创建后准备**开机包**，在首个 open turn/step 通过 `developer/message` 注入（不产生 user turn）：core 全量记忆、人格卡、active 记忆、昨日摘要/近期档案、DSH 使用说明；
 - 设置页可预览开机包；接口 `GET /dsh-onefish-core/api/session/bootpack`；
 - 换日后封存旧会话，并异步整理进全量档案；
 - 整理失败保留 pending，下次启动重试；

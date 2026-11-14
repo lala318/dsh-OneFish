@@ -1,6 +1,6 @@
-# ADR-0004: 日会话创建时注入开机包
+# ADR-0004: 日会话首轮注入开机包
 
-- 状态：Accepted
+- 状态：Accepted（2026-11-14 修正）
 - 日期：2026-11-13
 - 相关：ADR-0002、ADR-0003
 
@@ -14,13 +14,14 @@ DSH 的 Session 支持 `developer/message` surface event。它可以进入模型
 
 ## 决策
 
-**日会话创建时，通过 DSH `developer/message` 注入一次“开机包”。**
+**日会话创建时准备“开机包”，在首个 open step 注入一次。**
 
 具体：
 
 - 开机包由 Core 生成，不经过模型；
 - 注入目标：当天的日会话；
-- 注入方式：`session.append('developer/message', { message: { role: 'developer', content: [{ type: 'text', text }] } }, { surfaceOp: 'append' })`；
+- 注入时机：DSH 首个 `step/start` 后，使用真实 open `turn` / `step`；
+- 注入方式：`session.append('developer/message', { turn, step, message: { role: 'developer', content: [{ type: 'text', text }] } }, { surfaceOp: 'append' })`；
 - **不产生 user turn，不触发模型调用**；
 - 每天只注入一次，状态记录在 `session-index.json` 的 `bootPackAt`；
 - 当天已有会话但没有 `bootPackAt` 时允许补注入一次；
@@ -39,6 +40,22 @@ DSH 的 Session 支持 `developer/message` surface event。它可以进入模型
 7. “今天第一次打开日会话”。
 
 总量默认 `bootMaxChars=5000`，超出时截断非核心部分。
+
+## 2026-11-14 修正：写入 open turn/step
+
+DSH v4 的 `developer/message` 必须匹配一个已经打开的 turn/step。原方案在日会话创建时直接 append，事件落在 `turn/start` 之前；DSH 重启 resume 时会报：
+
+```text
+SessionFormatError: developer/message does not match an open turn and step
+```
+
+因此改为：
+
+- 创建日会话时只把开机包标记为 `pending`，不写 developer/message；
+- 监听 DSH 的 `step/start`，拿到真实的 `turn` / `step` 后再注入；
+- 没有 open turn/step 时返回 `skipped`，记录 `bootPackStatus` / `bootPackError`，不写坏事件；
+- 成功后写 `bootPackAt` / `bootPackChars` / `bootPackStatus='injected'`；
+- 重启后 pending 状态仍可等待第一个 step；已有消息的会话不再补写。
 
 ## 后果
 
@@ -73,10 +90,11 @@ DSH 原生窗口的 prompt 由 DSH 提交，Core 无法可靠拦截；容易漏�
 
 ## 验收标准
 
-- 新建日会话后，`bootPackAt` 非 0；
+- 新建日会话后，`bootPackAt` 非 0（首轮 step/start 注入后）；
 - 开机包包含当前人格卡；
 - 开机包包含 core 全量记忆；
 - 开机包不产生 user turn；
 - 同一天不重复注入；
 - 注入失败不阻塞会话创建，且可重试；
+- 没有 open turn/step 时不会写坏 developer/message；
 - 可从设置页/API 预览开机包。
