@@ -20,14 +20,14 @@ try {
   assert.ok(health.vector);
   assert.ok(health.vector.count >= 3 || health.vector.count === 0);
 
-  const hits = core.memory.search('记忆向量', { k: 5 });
+  const hits = await core.memory.search('记忆向量', { k: 5 });
   assert.ok(hits.some((hit) => hit.id === second.id));
 
   const block = core.memory.blocks();
   assert.match(block.active, /主人喜欢先给结论/);
   assert.match(block.core, /我是 OneFish/);
 
-  const maintained = core.memory.maintain({ day: '2026-11-15' });
+  const maintained = await core.memory.maintain({ day: '2026-11-15' });
   assert.equal(maintained.ok, true);
   assert.ok(maintained.indexed.total >= 3);
   assert.ok(fs.existsSync(core.paths.home + '/memory-v2/space/vectors/index.jsonl'));
@@ -35,6 +35,35 @@ try {
   const index = path.join(core.memory.resolveDirs().spaceDir, 'vectors', 'index.jsonl');
   assert.ok(fs.existsSync(index));
   assert.ok(core.memory.list().every((row) => typeof row.retention === 'number'));
+
+  // P1：模型输出的 ops 经过校验后落库。
+  const consolidated = core.memory.applyConsolidation({
+    day: '2026-11-15',
+    text: JSON.stringify({
+      ops: [{
+        op: 'add',
+        tier: 'active',
+        kind: 'preference',
+        text: '主人夜间整理记忆时不需要人工逐条审计',
+        confidence: 0.8,
+        sourceDays: ['2026-11-15'],
+      }],
+    }),
+  });
+  assert.equal(consolidated.ok, true);
+  assert.equal(consolidated.applied.length, 1);
+  const prompt = core.memory.consolidationPrompt({ day: '2026-11-15', digest: '# 今天' });
+  assert.match(prompt.system, /记忆整理器/);
+  assert.match(prompt.user, /今天/);
+
+  // P2：新事实替代旧事实；旧条目保留但不进入默认列表/检索。
+  const oldFact = core.memory.add({ text: '项目使用 Vue 做前端', tier: 'active', importance: 3 });
+  const replaced = core.memory.supersede(oldFact.id, { text: '项目前端已改为 React', importance: 4 });
+  assert.equal(replaced.old.status, 'superseded');
+  assert.equal(replaced.old.supersededBy, replaced.replacement.id);
+  assert.deepEqual(replaced.replacement.supersedes, [oldFact.id]);
+  assert.ok(!core.memory.list().some((row) => row.id === oldFact.id));
+  assert.ok(core.memory.health().superseded >= 1);
 
   // 旧条目衰减后不应影响 core 注入。
   const old = core.memory.add({
@@ -44,7 +73,7 @@ try {
     createdAt: Date.now() - 400 * 86400000,
     updatedAt: Date.now() - 400 * 86400000,
   });
-  const decayed = core.memory.maintain({ day: '2026-11-15' });
+  const decayed = await core.memory.maintain({ day: '2026-11-15' });
   assert.ok(decayed.decayed.changed >= 1);
   assert.doesNotMatch(core.memory.blocks().active, /很久以前的低优先级片段/);
   assert.ok(old.id);

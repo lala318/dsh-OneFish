@@ -13,6 +13,7 @@ import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { createCore } from './core/index.js';
 import { createDshSessionAdapter } from './core/adapters/dsh/session-adapter.js';
+import { createDshCompletion } from './core/adapters/dsh/completion.js';
 import { createDshComponentBroker } from './core/adapters/dsh/component-broker.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -37,12 +38,12 @@ export function createBrokerSessionController(sessionController, { timeoutMs = 1
 
 export function apply(ctx) {
   let sessionAdapter = null;
+  let workspaceRegistry = null;
+  let sessions = null;
   try {
-    let workspaceRegistry = null;
     try {
       workspaceRegistry = ctx.get?.('workspaceRegistry') ?? ctx.workspaceRegistry ?? null;
     } catch {}
-    let sessions = null;
     try {
       sessions = ctx.get?.('sessions') ?? ctx.sessions ?? null;
     } catch {}
@@ -56,10 +57,29 @@ export function apply(ctx) {
     console.log(`[onefish-core] 会话适配器不可用：${error?.message ?? error}`);
   }
 
-  const core = createCore({
+  const memoryCompletion = createDshCompletion({
+    sessionController: ctx.sessionController,
+    workspaceRegistry,
+    sessions,
+    preset: 'onefish-core',
+    cwd: REPO_ROOT,
+    logger: (...args) => console.log('[onefish-core]', ...args),
+  });
+
+  let core;
+  const memoryConsolidator = memoryCompletion
+    ? async ({ day, digest }) => {
+      const result = await core.memory.consolidate({ day, digest, complete: memoryCompletion.complete });
+      core.log(`模型记忆提炼完成：${day} 应用 ${result.applied.length} / 跳过 ${result.skipped.length}`);
+      return result;
+    }
+    : null;
+
+  core = createCore({
     repoRoot: REPO_ROOT,
     logger: (...args) => console.log('[onefish-core]', ...args),
     sessionAdapter,
+    memoryConsolidator,
     idlePrompt: ctx.sessionController
       ? async ({ sessionId, text }) => {
         const controller = createBrokerSessionController(ctx.sessionController);
@@ -247,7 +267,7 @@ export function apply(ctx) {
     }
     if (pathname === `${API_PREFIX}/memory/maintain` && req.method === 'POST') {
       const body = await readBody(req);
-      json(res, 200, core.memory.maintain({ day: String(body?.day || '') }));
+      json(res, 200, await core.memory.maintain({ day: String(body?.day || '') }));
       return;
     }
     if (pathname === `${API_PREFIX}/session/bootpack` && req.method === 'GET') {

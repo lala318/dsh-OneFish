@@ -4,6 +4,12 @@
  * 存储位置和文件布局由 adapters/fs/memory-store 负责；这里只做规则和排序。
  */
 import { memoryScore, retentionOf } from '../domain/memory-score.js';
+import {
+  buildConsolidatePrompt,
+  parseConsolidateOutput,
+  validateConsolidateOps,
+  applyConsolidateOps,
+} from './memory-consolidate.js';
 
 function safeLimit(value, fallback = 20, max = 100) {
   const n = Number(value);
@@ -35,7 +41,7 @@ export function createMemoryService({ store, persona, logger = () => {}, vectorF
     return store.getSpace(cur?.id || '').space;
   }
 
-  function search(query = '', { tier = '', k = 8 } = {}) {
+  async function search(query = '', { tier = '', k = 8 } = {}) {
     const q = String(query ?? '').trim();
     const limit = safeLimit(k, 8, 30);
     const s = space();
@@ -53,7 +59,7 @@ export function createMemoryService({ store, persona, logger = () => {}, vectorF
     if (q) {
       const vector = vectorFor(s);
       if (vector) {
-        try { vectorHits = vector.search(q, { k: Math.max(limit * 2, 12) }); } catch (error) {
+        try { vectorHits = await vector.search(q, { k: Math.max(limit * 2, 12) }); } catch (error) {
           logger(`记忆向量检索失败：${error?.message ?? error}`);
         }
       }
@@ -125,6 +131,34 @@ export function createMemoryService({ store, persona, logger = () => {}, vectorF
     return result;
   }
 
+  /** 用一条新事实替代旧事实：旧条目保留但不再注入/检索。 */
+  function supersede(id, patch = {}) {
+    const s = space();
+    const old = s.get(String(id || ''));
+    if (!old) return null;
+    const text = String(patch.text || '').trim();
+    if (!text) throw new Error('supersede text is required');
+    const replacement = s.add({
+      ...patch,
+      text,
+      tier: patch.tier || old.tier,
+      kind: patch.kind || old.kind,
+      tags: patch.tags || old.tags,
+      by: 'consolidator',
+      supersedes: [old.id],
+      sourceDays: patch.sourceDays || old.sourceDays,
+      confidence: patch.confidence ?? 0.8,
+    });
+    const superseded = s.update(old.id, {
+      status: 'superseded',
+      supersededBy: replacement.id,
+      validTo: Date.now(),
+      lastConfirmedAt: Date.now(),
+    });
+    vectorFor(s)?.invalidate();
+    return { old: superseded, replacement };
+  }
+
   function list({ tier = '', q = '', limit = 30, includeDeleted = false } = {}) {
     return space().list({
       tier,
@@ -138,17 +172,48 @@ export function createMemoryService({ store, persona, logger = () => {}, vectorF
     }));
   }
 
-  function maintain({ day = '', now = Date.now() } = {}) {
+  async function maintain({ day = '', now = Date.now() } = {}) {
     const s = space();
     const decayed = s.applyDecay({ now });
     const deduped = s.dedupe({ now });
     const vector = vectorFor(s);
-    const indexed = vector ? vector.build({ force: true, now }) : { total: 0, computed: 0, reused: 0 };
+    const indexed = vector ? await vector.build({ force: true, now }) : { total: 0, computed: 0, reused: 0 };
     const result = { ok: true, day, now, decayed, deduped, indexed };
     s.writeState({ lastMaintainedDay: day, lastMaintainedAt: now });
     s.audit(day || 'maintenance', { op: 'maintain', ...result });
     logger(`记忆维护：衰减 ${decayed.changed} / 休眠 ${decayed.dormant} / 去重 ${deduped.merged} / 向量 ${indexed.total}`);
     return result;
+  }
+
+  function consolidationPrompt({ day = '', digest = '', events = [] } = {}) {
+    const s = space();
+    return buildConsolidatePrompt({
+      day,
+      digest,
+      events,
+      core: s.list({ tier: 'core', limit: 0 }),
+      active: s.list({ tier: 'active', limit: 0 }),
+      knowledge: s.list({ tier: 'knowledge', limit: 0 }),
+    });
+  }
+
+  function applyConsolidation({ day = '', ops = null, text = '' } = {}) {
+    const s = space();
+    const parsed = Array.isArray(ops) ? ops : parseConsolidateOutput(text);
+    const checked = validateConsolidateOps(parsed, { space: s, day });
+    if (!checked.ok) return { ok: false, errors: checked.errors, applied: [], skipped: [] };
+    const result = applyConsolidateOps(s, checked.ops, { day });
+    if (result.applied.length) vectorFor(s)?.invalidate();
+    return { ok: true, errors: [], ...result };
+  }
+
+  async function consolidate({ day = '', digest = '', events = [], complete = null } = {}) {
+    if (typeof complete !== 'function') throw new Error('memory.consolidate requires complete(prompt)');
+    const prompt = consolidationPrompt({ day, digest, events });
+    const answer = await complete(prompt);
+    const applied = applyConsolidation({ day, text: answer });
+    logger(`模型记忆整理：${day} 应用 ${applied.applied.length} / 跳过 ${applied.skipped.length}`);
+    return { ...applied, prompt, answer };
   }
 
   function stats() {
@@ -174,6 +239,7 @@ export function createMemoryService({ store, persona, logger = () => {}, vectorF
         active: s.active,
         knowledge: s.knowledge,
         dormant: s.dormant,
+        superseded: s.superseded,
         dir: resolveDirs().spaceDir,
         vector: s.vector,
       };
@@ -182,5 +248,8 @@ export function createMemoryService({ store, persona, logger = () => {}, vectorF
     }
   }
 
-  return { resolveDirs, search, add, update, remove, list, stats, blocks, health, maintain };
+  return {
+    resolveDirs, search, add, update, remove, supersede, list, stats, blocks, health, maintain,
+    consolidationPrompt, applyConsolidation, consolidate,
+  };
 }

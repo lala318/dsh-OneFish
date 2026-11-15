@@ -42,28 +42,37 @@
 ### 4. 向量索引
 
 - 索引路径：`memory-v2/space/vectors/index.jsonl`；
-- 当前使用本地 char n-gram hash 向量（256 维），零网络依赖；
-- `textHash` 增量复用；
-- `memory_search` 做 lexical + cosine 混合排序；
-- embedding 实现可替换，索引格式不变。
+- 默认 embedding：`bge-small-zh-v1.5` ONNX（512 维，模型/runtime 可配置）；
+- 模型不可用时回退本地 hash 向量（256 维），索引 meta 记录 model/dim；
+- `textHash` 增量复用，模型变化自动重建；
+- `memory_search` 做 lexical + cosine 混合排序。
 
-### 5. 夜间整理
+### 5. 夜间模型整理
 
-日终 consolidation 成功后执行 `memory.maintain`：
+日终 consolidation 成功后：
 
-1. `applyDecay`：更新 retention/stability/dormant；
-2. `dedupe`：正文相同的条目保留最强一条，其余软删；
-3. `buildVectorIndex`：重建向量索引；
-4. 写 `lastMaintainedDay` 和 audit。
+1. 确定性 `memory.maintain`：衰减、去重、向量重建；
+2. 用一个独立 DSH 会话让模型读取日摘要/现有记忆，输出严格 JSON ops；
+3. `memory-consolidate` 校验配额、id、置信度、core 上限、敏感信息、重复；
+4. 自动落库 `add/update/merge/forget/pin/unpin/supersede`；
+5. 人工只保留删除和手动添加，不做逐条审计；
+6. 模型失败不影响确定性维护，下一日可重试。
 
-手动入口：`memory_maintain` MCP / `POST /api/memory/maintain`。
+手动入口：`memory_maintain`、`memory_consolidation_prompt`、`memory_consolidate_apply`、`memory_supersede` MCP / `POST /api/memory/maintain`。
+
+### 6. 记忆质量
+
+- `sourceDays` / `sourceEventIds` / `confidence` / `lastConfirmedAt`；
+- `superseded` 状态、`supersededBy`、`validTo`；
+- `supersede` 用新事实替代旧事实，旧内容保留在 `meta`，不再默认检索/注入；
+- core 的自动 forget 仍要求明确 owner 请求，防止模型误删身份/长期承诺。
 
 ## 后果
 
 - 时间在每轮都可见，不再依赖消息正文携带；
 - 空闲钟是可配置的，不默认打扰；
 - 记忆衰减可解释、可恢复，不直接丢原文；
-- 向量索引本地可用，但不是 bge/ONNX 语义向量；后续可替换 embedding 适配器。
+- 语义向量依赖本地 ONNX 模型；模型缺失时自动回退 hash，仍可工作但语义能力下降；
 
 ## 验收
 

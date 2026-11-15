@@ -19,6 +19,7 @@ export const DEFAULT_CONFIG = Object.freeze({
   historyPageMessages: 200,
   historyMaxPages: 50,
   timestamp: { enabled: true },
+  embedding: { runtimeDir: '', modelDir: '' },
   idleClock: {
     enabled: false,
     checkIntervalMs: 5 * 60 * 1000,
@@ -59,6 +60,10 @@ export function normalizeConfig(raw = {}) {
       ...DEFAULT_CONFIG.timestamp,
       ...(source.timestamp && typeof source.timestamp === 'object' ? source.timestamp : {}),
       enabled: !(source.timestamp && source.timestamp.enabled === false),
+    },
+    embedding: {
+      runtimeDir: typeof source.embedding?.runtimeDir === 'string' ? source.embedding.runtimeDir.trim() : '',
+      modelDir: typeof source.embedding?.modelDir === 'string' ? source.embedding.modelDir.trim() : '',
     },
     idleClock: {
       ...DEFAULT_CONFIG.idleClock,

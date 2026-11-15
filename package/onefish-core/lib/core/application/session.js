@@ -24,6 +24,7 @@ export function createSessionService({
   archive = null,
   bootPack = null,
   memoryMaintenance = null,
+  memoryConsolidator = null,
   config = DEFAULT_CONFIG,
   logger = () => {},
   now = () => Date.now(),
@@ -485,6 +486,14 @@ export function createSessionService({
           await memoryMaintenance({ day, digestPath: result.digestPath, sessionId: entry.sessionId });
         } catch (error) {
           logger(`夜间记忆整理失败 ${day}：${error?.message ?? error}`);
+        }
+      }
+      if (memoryConsolidator) {
+        try {
+          const digest = archive?.readDigest ? archive.readDigest(day) : '';
+          await memoryConsolidator({ day, digest, sessionId: entry.sessionId });
+        } catch (error) {
+          logger(`模型记忆提炼失败 ${day}：${error?.message ?? error}`);
         }
       }
       logger(`日终整理完成：${day}（${result.count} 条消息）`);

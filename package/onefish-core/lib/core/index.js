@@ -14,6 +14,7 @@ import { createCorePaths, ensureCoreDirs } from './adapters/fs/paths.js';
 import { createPersonaStore } from './adapters/fs/persona-store.js';
 import { createMemoryStore } from './adapters/fs/memory-store.js';
 import { createMemoryVectorIndex } from './adapters/fs/memory-vectors.js';
+import { createEmbeddingProvider } from './adapters/embeddings/index.js';
 import { createSessionIndexStore } from './adapters/fs/session-index.js';
 import { createPersonaService } from './application/persona.js';
 import { createMemoryService } from './application/memory.js';
@@ -35,6 +36,7 @@ export function createCore({
   now = () => Date.now(),
   config: configOverride = {},
   idlePrompt = null,
+  memoryConsolidator = null,
 } = {}) {
   const paths = createCorePaths({ home, repoRoot });
   ensureCoreDirs(paths);
@@ -43,6 +45,11 @@ export function createCore({
   if (!config.workspacePath) config.workspacePath = paths.workspacePath;
   const personaStore = createPersonaStore({ paths });
   const memoryStore = createMemoryStore({ paths, logger });
+  const embedding = createEmbeddingProvider({
+    runtimeDir: config.embedding?.runtimeDir || '',
+    modelDir: config.embedding?.modelDir || '',
+    logger,
+  });
   const sessionIndex = createSessionIndexStore({ paths });
 
   const persona = createPersonaService({ store: personaStore, logger });
@@ -52,6 +59,7 @@ export function createCore({
     logger,
     vectorFactory: (space) => createMemoryVectorIndex({
       space,
+      embedding,
       logger: (...args) => logger('[memory-vectors]', ...args),
     }),
   });
@@ -63,6 +71,7 @@ export function createCore({
     archive,
     bootPack,
     memoryMaintenance: ({ day }) => memory.maintain({ day }),
+    memoryConsolidator,
     config,
     logger,
     now,
@@ -96,6 +105,7 @@ export function createCore({
       session: session.stats(),
       archive: { days: archive.listDays().length },
       idle: idle.status(),
+      embedding: embedding.status(),
       components: components.list(),
     };
   }
@@ -108,7 +118,7 @@ export function createCore({
     try { logger(line); } catch {}
   }
 
-  return { paths, config, persona, memory, session, archive, bootPack, idle, components, componentApi, health, log };
+  return { paths, config, persona, memory, session, archive, bootPack, idle, embedding, components, componentApi, health, log };
 }
 
 export { createCorePaths, resolveCoreHome } from './adapters/fs/paths.js';

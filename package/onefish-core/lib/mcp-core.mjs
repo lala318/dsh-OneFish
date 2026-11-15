@@ -53,7 +53,7 @@ server.tool(
     k: z.number().int().min(1).max(30).optional().describe('返回条数，默认 8'),
   },
   async ({ query, tier, k }) => {
-    try { return text(core.memory.search(query || '', { tier: tier || '', k: k || 8 })); }
+    try { return text(await core.memory.search(query || '', { tier: tier || '', k: k || 8 })); }
     catch (error) { return fail(error); }
   }
 );
@@ -158,6 +158,52 @@ server.tool(
 );
 
 server.tool(
+  'memory_consolidation_prompt',
+  '生成某天的记忆整理提示词，交给模型输出 JSON ops；通常由夜间整理调用。',
+  {
+    day: z.string().describe('逻辑日 YYYY-MM-DD'),
+    digest: z.string().optional().describe('当天摘要，可选'),
+  },
+  async ({ day, digest }) => {
+    try { return text(core.memory.consolidationPrompt({ day, digest: digest || '' })); }
+    catch (error) { return fail(error); }
+  }
+);
+
+server.tool(
+  'memory_consolidate_apply',
+  '把模型输出的 {"ops":[...]} 校验后应用到记忆空间；人工只保留删除/手动添加，不做逐条审计。',
+  {
+    day: z.string().describe('逻辑日 YYYY-MM-DD'),
+    text: z.string().min(1).describe('模型输出的 JSON 文本'),
+  },
+  async ({ day, text: body }) => {
+    try { return text(await core.memory.applyConsolidation({ day, text: body })); }
+    catch (error) { return fail(error); }
+  }
+);
+
+server.tool(
+  'memory_supersede',
+  '用一条新事实替代旧事实：旧条目保留但不再注入/检索；用于处理过时或矛盾记忆。',
+  {
+    id: z.string().describe('被替代的旧记忆 id'),
+    text: z.string().min(1).describe('新事实'),
+    tier: z.enum(['core', 'active', 'knowledge']).optional(),
+    kind: z.enum(['fact', 'preference', 'relation', 'commitment', 'open_loop', 'slang', 'meme', 'sticker', 'other']).optional(),
+    tags: z.array(z.string()).max(8).optional(),
+    importance: z.number().int().min(1).max(5).optional(),
+    confidence: z.number().min(0).max(1).optional(),
+  },
+  async ({ id, ...patch }) => {
+    try {
+      const result = core.memory.supersede(id, patch);
+      return result ? text(result) : { content: [{ type: 'text', text: `没有找到记忆：${id}` }], isError: true };
+    } catch (error) { return fail(error); }
+  }
+);
+
+server.tool(
   'idle_status',
   '查看空闲钟状态（是否启用、当前空闲时长、冷却与今日触发次数）。',
   {},
@@ -182,7 +228,7 @@ server.tool(
   '执行一次记忆维护：遗忘曲线衰减、去重、向量索引重建。夜间整理也走同一条路径。',
   { day: z.string().optional().describe('逻辑日，可选') },
   async ({ day }) => {
-    try { return text(core.memory.maintain({ day: day || '' })); }
+    try { return text(await core.memory.maintain({ day: day || '' })); }
     catch (error) { return fail(error); }
   }
 );

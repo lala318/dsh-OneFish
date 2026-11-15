@@ -46,7 +46,8 @@ npm run setup
 - 需要指定别处：设置 `ONEFISH_CORE_HOME`。
 - 人格：默认内置中性人格；在设置页保存后会写到 `~/.dsh/onefish-core/core/persona.md`；不自动继承旧 `roles/` 或旧角色包。
 - 记忆：`~/.dsh/onefish-core/memory-v2/space/entries.jsonl`（首次写入时创建）。
-- 记忆向量索引：`~/.dsh/onefish-core/memory-v2/space/vectors/index.jsonl`（本地 char n-gram 向量，支持后续替换 embedding）。
+- 记忆向量索引：`~/.dsh/onefish-core/memory-v2/space/vectors/index.jsonl`（默认 bge-small-zh-v1.5 ONNX；模型不可用时自动回退本地 hash）。
+- 记忆整理：模型输出 JSON ops，`memory-consolidate` 校验后落库；人工只保留删除/手动添加。
 - 空闲钟状态：`~/.dsh/onefish-core/core/idle-clock.json`。
 - 日会话索引：`~/.dsh/onefish-core/core/session-index.json`（只存 day → sessionId，不存消息）。
 - 全量档案：`~/.dsh/onefish-core/archive/days/YYYY-MM-DD.jsonl`。
@@ -88,8 +89,24 @@ MCP：`idle_status`、`idle_preview`。
 ## 记忆维护
 
 - **遗忘曲线**：按重要度、使用次数、层级计算 stability / retention；low-retention active 记忆在主动注入时被跳过。
-- **向量索引**：memory entries 的本地向量索引，`memory_search` 做 lexical + cosine 混合排序。
-- **夜间整理**：日终 consolidation 后执行 `memory.maintain`：衰减、去重、向量重建；同一路径也可通过 `memory_maintain` MCP / `POST /api/memory/maintain` 手动触发。
+- **语义向量**：默认加载 `~/.dsh/onefish-core/runtime/onnx-embed/model` 的 bge-small-zh-v1.5；`memory_search` 做 lexical + cosine 混合检索。模型/onnxruntime 不可用时自动回退本地 hash，并写入索引 model 标记。
+- **夜间模型整理**：日终 consolidation 后，Core 通过独立 DSH 会话让模型输出 `{"ops":[...]}`；`memory-consolidate` 校验后自动落库，人工只保留删除/手动添加，不逐条审计。
+- **矛盾/过期**：`supersede` 用新事实替代旧事实；旧条目保留在 `meta`/`superseded`，不再进入默认检索和注入。
+- 手动/调试入口：`memory_maintain`、`memory_consolidation_prompt`、`memory_consolidate_apply`、`memory_supersede` MCP。
+
+embedding 配置：
+
+```json
+{
+  "embedding": {
+    "runtimeDir": "C:/Users/you/.dsh/onefish-core/runtime/onnx-embed",
+    "modelDir": "C:/Users/you/.dsh/onefish-core/runtime/onnx-embed/model"
+  }
+}
+```
+
+模型目录需要 `model.onnx`、`vocab.txt`、`tokenizer_config.json`；runtime 目录需要可用的 `onnxruntime-node`。未配置时按默认路径自动查找，仍失败则回退 hash。
+
 
 ## 会话生命周期
 

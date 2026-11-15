@@ -53,7 +53,7 @@ try {
   // 记忆
   const added = core.memory.add({ text: '主人正在重构 OneFish 核心', tier: 'active', kind: 'fact', tags: ['项目'] });
   assert.ok(added.id);
-  const found = core.memory.search('重构', { k: 5 });
+  const found = await core.memory.search('重构', { k: 5 });
   assert.ok(found.some((item) => item.id === added.id), 'search 应能命中新记忆');
   const list = core.memory.list({ limit: 10 });
   assert.ok(list.some((item) => item.id === added.id));

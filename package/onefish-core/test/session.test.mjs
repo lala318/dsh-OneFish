@@ -56,10 +56,12 @@ try {
   assert.equal(dayKeyOf(new Date(2026, 10, 13, 4, 0).getTime()), '2026-11-13');
   assert.equal(dayStart('2026-11-13'), new Date(2026, 10, 13, 4, 0, 0, 0).getTime());
 
+  const consolidatedCalls = [];
   const core = createCore({
     home: temp,
     repoRoot: path.resolve(import.meta.dirname, '../..'),
     sessionAdapter: adapter,
+    memoryConsolidator: async ({ day, digest }) => { consolidatedCalls.push({ day, digest }); },
     now: () => now,
     config: { autoConsolidate: false, consolidateOnBootstrap: false, rolloverHour: 4, workspacePath: temp, workspaceTitle: 'onefish' },
   });
@@ -151,6 +153,9 @@ try {
   assert.equal(core.session.stats().pending, 0);
   assert.equal(core.session.stats().consolidated, 1);
   assert.equal(core.memory.stats().lastMaintainedDay, '2026-11-13');
+  assert.equal(consolidatedCalls.length, 1);
+  assert.equal(consolidatedCalls[0].day, '2026-11-13');
+  assert.match(consolidatedCalls[0].digest, /今天聊了日会话/);
   assert.deepEqual(core.archive.listDays(), ['2026-11-13']);
 
   // 幂等：不重复读历史

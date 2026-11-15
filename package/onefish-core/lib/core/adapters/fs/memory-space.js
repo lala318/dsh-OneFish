@@ -15,7 +15,7 @@ import path from 'node:path';
 import { decayPatch, memoryScore } from '../../domain/memory-score.js';
 
 export const SPACE_TIERS = Object.freeze(['core', 'active', 'knowledge']);
-export const SPACE_STATUSES = Object.freeze(['active', 'draft', 'rejected']);
+export const SPACE_STATUSES = Object.freeze(['active', 'draft', 'rejected', 'superseded']);
 export const SPACE_KINDS = Object.freeze([
   'fact', 'preference', 'relation', 'commitment', 'open_loop',
   'slang', 'meme', 'sticker', 'other',
@@ -97,6 +97,11 @@ export function normalizeSpaceEntry(input = {}, { id } = {}) {
     importance: clampInt(src.importance, tier === 'core' ? 5 : 3, 1, 5),
     sourceDays: normalizeDays(src.sourceDays),
     sourceEventIds: normalizeIds(src.sourceEventIds),
+    supersedes: normalizeIds(src.supersedes),
+    supersededBy: String(src.supersededBy || '').slice(0, 120),
+    validFrom: Number(src.validFrom) || createdAt,
+    validTo: Number(src.validTo) || 0,
+    lastConfirmedAt: Number(src.lastConfirmedAt) || Number(src.updatedAt) || createdAt,
     confidence: Math.min(1, Math.max(0, Number(src.confidence) || 0.5)),
     by: src.by === 'owner' ? 'owner' : (src.by === 'consolidator' ? 'consolidator' : 'agent'),
     createdAt,
@@ -179,7 +184,13 @@ export function createMemorySpace({ memoryDir, spaceDir, importantFile, kbFile, 
     const rows = readEntries();
     const idx = rows.findIndex((r) => r.id === id);
     if (idx < 0) return null;
-    const next = normalizeSpaceEntry({ ...rows[idx], ...patch, id, updatedAt: Date.now() }, { id });
+    const next = normalizeSpaceEntry({
+      ...rows[idx],
+      ...patch,
+      id,
+      updatedAt: Date.now(),
+      lastConfirmedAt: patch.lastConfirmedAt || Date.now(),
+    }, { id });
     rows[idx] = next;
     writeEntries(rows);
     return next;
@@ -353,9 +364,10 @@ export function createMemorySpace({ memoryDir, spaceDir, importantFile, kbFile, 
     return {
       total: rows.length,
       live: live.length,
-      core: live.filter((r) => r.tier === 'core').length,
-      active: live.filter((r) => r.tier === 'active').length,
-      knowledge: live.filter((r) => r.tier === 'knowledge').length,
+      core: live.filter((r) => r.tier === 'core' && r.status === 'active').length,
+      active: live.filter((r) => r.tier === 'active' && r.status === 'active').length,
+      knowledge: live.filter((r) => r.tier === 'knowledge' && r.status === 'active').length,
+      superseded: live.filter((r) => r.status === 'superseded').length,
       draft: live.filter((r) => r.status === 'draft').length,
       legacyImportant: live.filter((r) => r.meta?.legacyImportant).length,
       dormant: live.filter((r) => r.meta?.dormant === true).length,
