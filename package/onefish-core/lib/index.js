@@ -68,8 +68,8 @@ export function apply(ctx) {
 
   let core;
   const memoryConsolidator = memoryCompletion
-    ? async ({ day, digest }) => {
-      const result = await core.memory.consolidate({ day, digest, complete: memoryCompletion.complete });
+    ? async ({ day, digest, events }) => {
+      const result = await core.memory.consolidate({ day, digest, events, complete: memoryCompletion.complete });
       core.log(`模型记忆提炼完成：${day} 应用 ${result.applied.length} / 跳过 ${result.skipped.length}`);
       return result;
     }

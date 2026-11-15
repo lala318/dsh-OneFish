@@ -491,7 +491,8 @@ export function createSessionService({
       if (memoryConsolidator) {
         try {
           const digest = archive?.readDigest ? archive.readDigest(day) : '';
-          await memoryConsolidator({ day, digest, sessionId: entry.sessionId });
+          const events = archive?.readDay ? archive.readDay(day) : [];
+          await memoryConsolidator({ day, digest, events, sessionId: entry.sessionId });
         } catch (error) {
           logger(`模型记忆提炼失败 ${day}：${error?.message ?? error}`);
         }

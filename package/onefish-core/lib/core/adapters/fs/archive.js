@@ -112,6 +112,13 @@ export function createArchiveService({ paths, logger = () => {} }) {
     }
   }
 
+  /** 读取某天已归档的原始记录；供模型夜间整理使用。 */
+  function readDay(day) {
+    return readText(dayFile(day)).split(/\r?\n/).filter(Boolean).flatMap((line) => {
+      try { return [JSON.parse(line)]; } catch { return []; }
+    });
+  }
+
   function listDays() {
     try {
       return fs.readdirSync(paths.archiveDaysDir)
@@ -163,5 +170,5 @@ export function createArchiveService({ paths, logger = () => {} }) {
     return out;
   }
 
-  return { consolidateDay, readDigest, listDays, search };
+  return { consolidateDay, readDigest, readDay, listDays, search };
 }
