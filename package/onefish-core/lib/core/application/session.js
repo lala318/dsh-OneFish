@@ -199,8 +199,16 @@ export function createSessionService({
       });
     } catch (error) {
       const message = String(error?.message ?? error);
-      logger(`开机包 step/start 注入失败 ${id}：${message}`);
-      return index.updateActive({ bootPackStatus: 'failed', bootPackAt: 0, bootPackChars: 0, bootPackError: message, lastError: message });
+      // 事件 publish 期间 append 会被 DSH 拒绝；这是可重试状态，不要永久失败。
+      const retryable = /cannot reenter|another append is being published/i.test(message);
+      logger(`开机包 step/start 注入${retryable ? '延后重试' : '失败'} ${id}：${message}`);
+      return index.updateActive({
+        bootPackStatus: retryable ? 'pending' : 'failed',
+        bootPackAt: 0,
+        bootPackChars: 0,
+        bootPackError: message,
+        ...(retryable ? {} : { lastError: message }),
+      });
     }
   }
 
@@ -285,13 +293,17 @@ export function createSessionService({
             active = index.updateActive({ workspaceAttached: false, lastError: message }) || active;
           }
         }
-        if (active.bootPackStatus === 'pending' && Number(active.eventCount || 0) > 0) {
+        if (active.bootPackStatus === 'failed' && !active.bootPackAt) {
           active = index.updateActive({
-            bootPackStatus: 'skipped',
-            bootPackAt: now(),
-            bootPackChars: 0,
-            bootPackError: 'first turn started before boot pack injection',
+            bootPackStatus: 'pending',
+            bootPackError: '',
+            lastError: '',
           }) || active;
+        }
+        if (active.bootPackStatus === 'pending' && Number(active.eventCount || 0) > 0) {
+          // 首个 step 已经过去，但不要在 ensureToday 里放弃：保留 pending，
+          // 下一个 step/start 仍可安全注入（不能回到第一轮，但至少不丢内容）。
+          active = index.updateActive({ bootPackError: 'waiting for next open step' }) || active;
         } else if (!active.bootPackStatus && !active.bootPackAt) {
           const injected = await applyBootPack(active, {});
           active = index.updateActive({

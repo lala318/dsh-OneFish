@@ -277,8 +277,13 @@ export function apply(ctx) {
           const sessionId = session?.id || event?.sessionId || event?.session_id || '';
           if (sessionId) core.session.noteActivity(sessionId, event || {});
           if (sessionId) {
-            Promise.resolve(core.session.handleEvent(sessionId, event || {}))
-              .catch((error) => core.log(`开机包事件处理失败：${error?.message ?? error}`));
+            // DSH 当前正在 publish 这条事件；直接 append 会触发
+            // "session append cannot reenter while another append is being published"。
+            // 先让当前 publish 完成，再在微任务里注入开机包。
+            queueMicrotask(() => {
+              Promise.resolve(core.session.handleEvent(sessionId, event || {}))
+                .catch((error) => core.log(`开机包事件处理失败：${error?.message ?? error}`));
+            });
           }
           componentBroker?.handleEvent(session, event || {});
         } catch (error) {
