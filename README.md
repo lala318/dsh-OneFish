@@ -35,6 +35,7 @@ OneFish/
 - [ADR-0003：全量记忆与 memory-space 分层，日终整理](docs/adr/0003-memory-layers-and-consolidation.md)
 - [ADR-0004：日会话首轮注入开机包](docs/adr/0004-boot-pack.md)
 - [ADR-0005：Component Contract v1](docs/adr/0005-component-contract.md)
+- [ADR-0006：对话节奏、空闲钟与记忆维护](docs/adr/0006-rhythm-and-memory.md)
 - [组件接入规范](docs/guides/COMPONENT-INTEGRATION.md)
 
 ## 安装 / 注册
@@ -63,6 +64,9 @@ npm run setup
 - 日会话默认放在 DSH 工作区 `onefish`（路径 `~/.dsh/OneFish`）；
 - 创建日会话后准备**开机包**，在首个 open turn/step 注入：core 全量记忆、人格卡、active 记忆、昨日摘要/近期档案、DSH 使用说明；
 - 开机包通过 `developer/message` 注入，不产生 user turn；设置页可预览；
+- 每轮 user turn 自动注入 `【当前时间】`，DSH 原生窗口直聊也保留时间；
+- 空闲钟：按空闲时长与随机冷却触发主动 prompt（默认关闭，可在 `core/config.json` 开启）；
+- 记忆：遗忘曲线衰减、本地向量索引、日终维护（衰减 / 去重 / 重建向量）。
 - 逻辑日默认 **04:00**；
 - “回收”是归档/隐藏，不删除历史。
 

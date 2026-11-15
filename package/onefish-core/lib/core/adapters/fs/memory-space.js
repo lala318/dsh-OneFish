@@ -12,6 +12,7 @@
 // 物理上只有 entries.jsonl 一份源；status/audit 只记录整理与审核轨迹。
 import fs from 'node:fs';
 import path from 'node:path';
+import { decayPatch, memoryScore } from '../../domain/memory-score.js';
 
 export const SPACE_TIERS = Object.freeze(['core', 'active', 'knowledge']);
 export const SPACE_STATUSES = Object.freeze(['active', 'draft', 'rejected']);
@@ -231,16 +232,11 @@ export function createMemorySpace({ memoryDir, spaceDir, importantFile, kbFile, 
   function activeBlock({ maxChars = 500, limit = 8, now = Date.now() } = {}) {
     // 迁移进来的旧 important 质量参差：先留在空间里可见，但不自动注入；
     // 由主人/整理器决定升 core 或改成 active。
-    const rows = list({ tier: 'active', limit: 0 }).filter((r) => r.space !== 'legacy');
-    const scored = rows.map((r) => {
-      const ageDays = Math.max(0, (now - (r.updatedAt || r.createdAt)) / 86400000);
-      return {
-        r,
-        score: r.importance * 0.55
-          + Math.exp(-ageDays / 90) * 0.25
-          + Math.min(0.2, (r.useCount || 0) * 0.01),
-      };
-    }).sort((a, b) => b.score - a.score);
+    const rows = list({ tier: 'active', limit: 0 }).filter((r) => r.space !== 'legacy' && r.meta?.dormant !== true);
+    const scored = rows.map((r) => ({
+      r,
+      score: memoryScore(r, { now }),
+    })).sort((a, b) => b.score - a.score);
     const lines = [];
     let used = 0;
     for (const { r } of scored) {
@@ -362,10 +358,13 @@ export function createMemorySpace({ memoryDir, spaceDir, importantFile, kbFile, 
       knowledge: live.filter((r) => r.tier === 'knowledge').length,
       draft: live.filter((r) => r.status === 'draft').length,
       legacyImportant: live.filter((r) => r.meta?.legacyImportant).length,
+      dormant: live.filter((r) => r.meta?.dormant === true).length,
       deleted: rows.filter((r) => r.deletedAt).length,
       spaces: [...new Set(live.map((r) => r.space))],
       lastConsolidatedDay: readState().lastConsolidatedDay || '',
       lastConsolidatedAt: readState().lastConsolidatedAt || 0,
+      lastMaintainedDay: readState().lastMaintainedDay || '',
+      lastMaintainedAt: readState().lastMaintainedAt || 0,
     };
   }
 
@@ -451,11 +450,59 @@ export function createMemorySpace({ memoryDir, spaceDir, importantFile, kbFile, 
     return { ok: true, imported, skipped, total: legacy.length };
   }
 
+  /** 离线衰减：只更新评分元数据，不删原文。 */
+  function applyDecay({ now = Date.now() } = {}) {
+    const rows = readEntries();
+    let changed = 0;
+    let dormant = 0;
+    for (const row of rows) {
+      if (row.deletedAt || row.tier === 'core') continue;
+      const patch = decayPatch(row, { now });
+      row.meta = { ...(row.meta || {}), ...patch };
+      if (patch.dormant) dormant += 1;
+      changed += 1;
+    }
+    if (changed) writeEntries(rows);
+    writeState({ lastDecayAt: now });
+    return { changed, dormant };
+  }
+
+  /** 夜间去重：相同正文只保留最强的一条，其余软删。 */
+  function dedupe({ now = Date.now() } = {}) {
+    const rows = readEntries();
+    const groups = new Map();
+    for (const row of rows) {
+      if (row.deletedAt) continue;
+      const key = String(row.text || '').replace(/\s+/g, '').toLowerCase();
+      if (!key) continue;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(row);
+    }
+    let merged = 0;
+    for (const group of groups.values()) {
+      if (group.length < 2) continue;
+      group.sort((a, b) => (b.importance - a.importance) || (b.useCount - a.useCount) || (b.updatedAt - a.updatedAt));
+      const keep = group[0];
+      keep.useCount = group.reduce((sum, row) => sum + (Number(row.useCount) || 0), 0);
+      keep.tags = normalizeTags([...new Set(group.flatMap((row) => row.tags || []))]);
+      keep.sourceDays = normalizeDays(group.flatMap((row) => row.sourceDays || []));
+      keep.meta = { ...(keep.meta || {}), dedupedAt: now, dedupedCount: group.length - 1 };
+      for (const row of group.slice(1)) {
+        row.deletedAt = now;
+        row.meta = { ...(row.meta || {}), dedupedInto: keep.id };
+        merged += 1;
+      }
+    }
+    if (merged) writeEntries(rows);
+    return { merged };
+  }
+
   return {
     root, entriesFile, stateFile, auditDir, importantPath, kbPath,
     readEntries, readState, writeState, audit,
     get, list, add, update, softDelete, restore, hardDelete, markUsed,
     coreBlock, activeBlock, knowledgeEntries, searchUnits, stats,
+    applyDecay, dedupe,
     kbEntryFromSpace, upsertKb, removeKb,
     migrateImportant, migrateKb,
   };

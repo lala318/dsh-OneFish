@@ -91,6 +91,18 @@ try {
   assert.match(adapter.injected[0].text, /我是测试核心/);
   assert.match(adapter.injected[0].text, /近期偏好是简洁/);
   assert.match(adapter.injected[0].text, /【人格卡】/);
+  assert.match(adapter.injected[0].text, /【当前时间】/);
+  assert.equal(injected.lastTimestampTurn, 1);
+
+  // 后续每一轮只注入时间戳。
+  const timed = await core.session.handleEvent('session-test-1', {
+    type: 'step/start',
+    data: { turn: 2, step: 1 },
+  });
+  assert.equal(timed.lastTimestampTurn, 2);
+  assert.equal(adapter.injected.length, 2);
+  assert.match(adapter.injected[1].text, /【当前时间】/);
+  assert.doesNotMatch(adapter.injected[1].text, /【OneFish 开机包】/);
   assert.equal(first.created, true);
   assert.equal(core.session.stats().active, true);
   assert.equal(core.session.current().status, 'active');
@@ -100,7 +112,7 @@ try {
   const same = await core.session.ensureToday();
   assert.equal(same.reused, true);
   assert.equal(adapter.createCount, 1);
-  assert.equal(adapter.injected.length, 1, '同一天不应重复注入开机包');
+  assert.equal(adapter.injected.length, 2, 'ensureToday 不应重复注入开机包或时间戳');
 
   core.session.noteActivity('session-test-1', { type: 'user/message' });
   assert.equal(core.session.current().eventCount, 1);
@@ -111,13 +123,14 @@ try {
   assert.equal(second.day, '2026-11-14');
   assert.equal(second.sessionId, 'session-test-2');
   assert.equal(second.bootPackStatus, 'pending');
-  assert.equal(adapter.injected.length, 1);
+  assert.equal(adapter.injected.length, 2);
   await core.session.handleEvent('session-test-2', {
     type: 'step/start',
     data: { turn: 1, step: 1 },
   });
-  assert.equal(adapter.injected.length, 2);
-  assert.match(adapter.injected[1].text, /【OneFish 开机包】2026-11-14/);
+  assert.equal(adapter.injected.length, 3);
+  assert.match(adapter.injected[2].text, /【OneFish 开机包】2026-11-14/);
+  assert.match(adapter.injected[2].text, /【当前时间】/);
   assert.equal(core.session.stats().pending, 1);
   assert.equal(adapter.createCount, 2);
   assert.equal(core.session.stats().pending, 1);
@@ -137,6 +150,7 @@ try {
   assert.ok(hits.some((hit) => hit.role === 'user' && /日会话/.test(hit.text)));
   assert.equal(core.session.stats().pending, 0);
   assert.equal(core.session.stats().consolidated, 1);
+  assert.equal(core.memory.stats().lastMaintainedDay, '2026-11-13');
   assert.deepEqual(core.archive.listDays(), ['2026-11-13']);
 
   // 幂等：不重复读历史

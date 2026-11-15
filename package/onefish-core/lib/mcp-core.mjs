@@ -157,4 +157,34 @@ server.tool(
   }
 );
 
+server.tool(
+  'idle_status',
+  '查看空闲钟状态（是否启用、当前空闲时长、冷却与今日触发次数）。',
+  {},
+  async () => {
+    try { return text(core.idle.status()); }
+    catch (error) { return fail(error); }
+  }
+);
+
+server.tool(
+  'idle_preview',
+  '预览下次空闲钟触发时会发给当前日会话的文本。',
+  {},
+  async () => {
+    try { return text(core.idle.preview()); }
+    catch (error) { return fail(error); }
+  }
+);
+
+server.tool(
+  'memory_maintain',
+  '执行一次记忆维护：遗忘曲线衰减、去重、向量索引重建。夜间整理也走同一条路径。',
+  { day: z.string().optional().describe('逻辑日，可选') },
+  async ({ day }) => {
+    try { return text(core.memory.maintain({ day: day || '' })); }
+    catch (error) { return fail(error); }
+  }
+);
+
 await server.connect(new StdioServerTransport());

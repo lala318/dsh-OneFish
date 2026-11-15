@@ -5,7 +5,7 @@
 ## 装什么
 
 - DSH 插件宿主：`onefish-core`
-- MCP server：`lib/mcp-core.mjs`（memory_* / memory_archive_search / persona_get / session_get）
+- MCP server：`lib/mcp-core.mjs`（memory_* / memory_archive_search / memory_maintain / idle_* / persona_get / session_get）
 - agent preset：`presets/onefish-core.patch.yml`
 
 ## 不装什么
@@ -46,9 +46,50 @@ npm run setup
 - 需要指定别处：设置 `ONEFISH_CORE_HOME`。
 - 人格：默认内置中性人格；在设置页保存后会写到 `~/.dsh/onefish-core/core/persona.md`；不自动继承旧 `roles/` 或旧角色包。
 - 记忆：`~/.dsh/onefish-core/memory-v2/space/entries.jsonl`（首次写入时创建）。
+- 记忆向量索引：`~/.dsh/onefish-core/memory-v2/space/vectors/index.jsonl`（本地 char n-gram 向量，支持后续替换 embedding）。
+- 空闲钟状态：`~/.dsh/onefish-core/core/idle-clock.json`。
 - 日会话索引：`~/.dsh/onefish-core/core/session-index.json`（只存 day → sessionId，不存消息）。
 - 全量档案：`~/.dsh/onefish-core/archive/days/YYYY-MM-DD.jsonl`。
 - 日摘要：`~/.dsh/onefish-core/archive/digests/YYYY-MM-DD.md`。
+
+## 时间戳
+
+每轮 user turn 的第一个 `step/start`，Core 通过 `developer/message` 自动注入一次 `【当前时间】`；不修改用户正文，DSH 原生窗口直接对话也不会丢时间。
+
+配置：
+
+```json
+{ "timestamp": { "enabled": true } }
+```
+
+## 空闲钟
+
+空闲时钟来自旧版插件，Core 侧是：
+
+- 纯概率曲线：空闲越久越可能触发，触发后随机冷却；
+- 状态持久化到 `core/idle-clock.json`；
+- 默认 `enabled: false`，启用后会向当前日会话发一条主动 prompt；
+- 可配 `minIdleMs`、`scaleHours`、`shape`、`cooldownMinMs`、`cooldownMaxMs`。
+
+```json
+{
+  "idleClock": {
+    "enabled": true,
+    "minIdleMs": 600000,
+    "scaleHours": 3,
+    "shape": 2
+  }
+}
+```
+
+接口：`GET /dsh-onefish-core/api/idle/status`、`GET /idle/preview`、`POST /idle/run`。
+MCP：`idle_status`、`idle_preview`。
+
+## 记忆维护
+
+- **遗忘曲线**：按重要度、使用次数、层级计算 stability / retention；low-retention active 记忆在主动注入时被跳过。
+- **向量索引**：memory entries 的本地向量索引，`memory_search` 做 lexical + cosine 混合排序。
+- **夜间整理**：日终 consolidation 后执行 `memory.maintain`：衰减、去重、向量重建；同一路径也可通过 `memory_maintain` MCP / `POST /api/memory/maintain` 手动触发。
 
 ## 会话生命周期
 

@@ -9,6 +9,7 @@
 | [0003](0003-memory-layers-and-consolidation.md) | 全量记忆与 memory-space 分层，日终整理 | Accepted |
 | [0004](0004-boot-pack.md) | 日会话首轮注入开机包 | Accepted |
 | [0005](0005-component-contract.md) | Component Contract v1：组件边界与消息信封 | Accepted |
+| [0006](0006-rhythm-and-memory.md) | 对话节奏、空闲钟与记忆维护 | Accepted |
 
 约定：
 

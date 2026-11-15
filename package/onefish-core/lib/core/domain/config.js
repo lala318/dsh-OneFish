@@ -18,6 +18,16 @@ export const DEFAULT_CONFIG = Object.freeze({
   digestMaxChars: 1200,
   historyPageMessages: 200,
   historyMaxPages: 50,
+  timestamp: { enabled: true },
+  idleClock: {
+    enabled: false,
+    checkIntervalMs: 5 * 60 * 1000,
+    minIdleMs: 10 * 60 * 1000,
+    scaleHours: 3,
+    shape: 2,
+    cooldownMinMs: 45 * 60 * 1000,
+    cooldownMaxMs: 90 * 60 * 1000,
+  },
   components: {},
 });
 
@@ -45,5 +55,15 @@ export function normalizeConfig(raw = {}) {
     digestMaxChars: clampInt(source.digestMaxChars, DEFAULT_CONFIG.digestMaxChars, 200, 4000),
     autoConsolidate: source.autoConsolidate !== false,
     consolidateOnBootstrap: source.consolidateOnBootstrap !== false,
+    timestamp: {
+      ...DEFAULT_CONFIG.timestamp,
+      ...(source.timestamp && typeof source.timestamp === 'object' ? source.timestamp : {}),
+      enabled: !(source.timestamp && source.timestamp.enabled === false),
+    },
+    idleClock: {
+      ...DEFAULT_CONFIG.idleClock,
+      ...(source.idleClock && typeof source.idleClock === 'object' ? source.idleClock : {}),
+      enabled: source.idleClock?.enabled === true,
+    },
   };
 }

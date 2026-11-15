@@ -45,6 +45,10 @@ function normalizeEntry(entry) {
       ? entry.bootPackStatus
       : (Number(entry.bootPackAt || 0) > 0 ? 'injected' : ''),
     bootPackError: typeof entry.bootPackError === 'string' ? entry.bootPackError : '',
+    lastTimestampTurn: Number(entry.lastTimestampTurn || 0),
+    lastTimestampAt: Number(entry.lastTimestampAt || 0),
+    timestampInjectingTurn: Number(entry.timestampInjectingTurn || 0),
+    timestampError: typeof entry.timestampError === 'string' ? entry.timestampError : '',
     workspaceAttached: entry.workspaceAttached !== false,
     createdAt: Number(entry.createdAt || 0),
     sealedAt: Number(entry.sealedAt || 0),

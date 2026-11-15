@@ -9,6 +9,7 @@
  * 不加载具体频道组件；那些以后作为可选组件接入。
  */
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { createCore } from './core/index.js';
 import { createDshSessionAdapter } from './core/adapters/dsh/session-adapter.js';
@@ -59,6 +60,17 @@ export function apply(ctx) {
     repoRoot: REPO_ROOT,
     logger: (...args) => console.log('[onefish-core]', ...args),
     sessionAdapter,
+    idlePrompt: ctx.sessionController
+      ? async ({ sessionId, text }) => {
+        const controller = createBrokerSessionController(ctx.sessionController);
+        return controller.prompt({
+          sessionId,
+          requestId: randomUUID(),
+          mode: 'queue',
+          content: [{ type: 'text', text }],
+        });
+      }
+      : null,
   });
   const disposers = [];
 
@@ -233,6 +245,11 @@ export function apply(ctx) {
       json(res, 200, { ok: true, entry });
       return;
     }
+    if (pathname === `${API_PREFIX}/memory/maintain` && req.method === 'POST') {
+      const body = await readBody(req);
+      json(res, 200, core.memory.maintain({ day: String(body?.day || '') }));
+      return;
+    }
     if (pathname === `${API_PREFIX}/session/bootpack` && req.method === 'GET') {
       const active = core.session.current();
       if (!active) { json(res, 404, { ok: false, error: '今天还没有日会话' }); return; }
@@ -243,6 +260,18 @@ export function apply(ctx) {
     if (pathname === `${API_PREFIX}/sessions` && req.method === 'GET') {
       const status = core.session.status();
       json(res, 200, { ok: true, ...status, current: status.active });
+      return;
+    }
+    if (pathname === `${API_PREFIX}/idle/status` && req.method === 'GET') {
+      json(res, 200, core.idle.status());
+      return;
+    }
+    if (pathname === `${API_PREFIX}/idle/preview` && req.method === 'GET') {
+      json(res, 200, core.idle.preview());
+      return;
+    }
+    if (pathname === `${API_PREFIX}/idle/run` && req.method === 'POST') {
+      json(res, 200, await core.idle.check({ manual: true }));
       return;
     }
     if (pathname === `${API_PREFIX}/session/ensure` && req.method === 'POST') {
@@ -297,6 +326,7 @@ export function apply(ctx) {
 
   let bootstrapTimer = null;
   let dayTimer = null;
+  let idleTimer = null;
   if (sessionAdapter) {
     bootstrapTimer = setTimeout(() => {
       core.session.bootstrap().catch((error) => core.log(`启动日会话失败：${error?.message ?? error}`));
@@ -306,6 +336,10 @@ export function apply(ctx) {
       core.session.ensureToday().catch((error) => core.log(`日会话检查失败：${error?.message ?? error}`));
     }, 5 * 60 * 1000);
     dayTimer.unref?.();
+    idleTimer = setInterval(() => {
+      core.idle.check().catch((error) => core.log(`空闲钟检查失败：${error?.message ?? error}`));
+    }, Math.max(30_000, Number(core.idle.config.checkIntervalMs) || 5 * 60 * 1000));
+    idleTimer.unref?.();
   }
 
   if (typeof ctx.effect === 'function') {
@@ -313,6 +347,7 @@ export function apply(ctx) {
       try { off?.(); } catch {}
       try { if (bootstrapTimer) clearTimeout(bootstrapTimer); } catch {}
       try { if (dayTimer) clearInterval(dayTimer); } catch {}
+      try { if (idleTimer) clearInterval(idleTimer); } catch {}
       for (const dispose of disposers.splice(0)) { try { dispose?.(); } catch {} }
     });
   }

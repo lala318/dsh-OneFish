@@ -40,6 +40,7 @@ export function createCorePaths({ home = '', repoRoot = process.cwd() } = {}) {
     currentCharacterFile: path.join(coreHome, 'characters', 'current.json'),
     coreDir: path.join(coreHome, 'core'),
     sessionIndexFile: path.join(coreHome, 'core', 'session-index.json'),
+    idleStateFile: path.join(coreHome, 'core', 'idle-clock.json'),
     configFile: path.join(coreHome, 'core', 'config.json'),
     archiveDir: path.join(coreHome, 'archive'),
     archiveDaysDir: path.join(coreHome, 'archive', 'days'),

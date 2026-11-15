@@ -13,14 +13,17 @@ import fs from 'node:fs';
 import { createCorePaths, ensureCoreDirs } from './adapters/fs/paths.js';
 import { createPersonaStore } from './adapters/fs/persona-store.js';
 import { createMemoryStore } from './adapters/fs/memory-store.js';
+import { createMemoryVectorIndex } from './adapters/fs/memory-vectors.js';
 import { createSessionIndexStore } from './adapters/fs/session-index.js';
 import { createPersonaService } from './application/persona.js';
 import { createMemoryService } from './application/memory.js';
 import { createSessionService } from './application/session.js';
 import { createArchiveService } from './adapters/fs/archive.js';
 import { createComponentStore } from './adapters/fs/component-store.js';
+import { createIdleStore } from './adapters/fs/idle-store.js';
 import { createBootPackService } from './application/boot-pack.js';
 import { createComponentRegistry } from './application/components.js';
+import { createIdleClockService } from './application/idle.js';
 import { DEFAULT_CONFIG } from './domain/config.js';
 import { loadConfig } from './adapters/fs/config.js';
 
@@ -31,6 +34,7 @@ export function createCore({
   sessionAdapter = null,
   now = () => Date.now(),
   config: configOverride = {},
+  idlePrompt = null,
 } = {}) {
   const paths = createCorePaths({ home, repoRoot });
   ensureCoreDirs(paths);
@@ -42,7 +46,15 @@ export function createCore({
   const sessionIndex = createSessionIndexStore({ paths });
 
   const persona = createPersonaService({ store: personaStore, logger });
-  const memory = createMemoryService({ store: memoryStore, persona, logger });
+  const memory = createMemoryService({
+    store: memoryStore,
+    persona,
+    logger,
+    vectorFactory: (space) => createMemoryVectorIndex({
+      space,
+      logger: (...args) => logger('[memory-vectors]', ...args),
+    }),
+  });
   const archive = createArchiveService({ paths, logger });
   const bootPack = createBootPackService({ persona, memory, archive, config, now });
   const session = createSessionService({
@@ -50,7 +62,16 @@ export function createCore({
     adapter: sessionAdapter,
     archive,
     bootPack,
+    memoryMaintenance: ({ day }) => memory.maintain({ day }),
     config,
+    logger,
+    now,
+  });
+  const idle = createIdleClockService({
+    store: createIdleStore({ paths }),
+    session: { current: () => session.current() },
+    config,
+    prompt: idlePrompt,
     logger,
     now,
   });
@@ -74,6 +95,7 @@ export function createCore({
       memory: memory.health(),
       session: session.stats(),
       archive: { days: archive.listDays().length },
+      idle: idle.status(),
       components: components.list(),
     };
   }
@@ -86,7 +108,7 @@ export function createCore({
     try { logger(line); } catch {}
   }
 
-  return { paths, config, persona, memory, session, archive, bootPack, components, componentApi, health, log };
+  return { paths, config, persona, memory, session, archive, bootPack, idle, components, componentApi, health, log };
 }
 
 export { createCorePaths, resolveCoreHome } from './adapters/fs/paths.js';

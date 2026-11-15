@@ -10,6 +10,7 @@
  */
 import { dayKeyOf, normalizeDayKey } from '../domain/day.js';
 import { DEFAULT_CONFIG } from '../domain/config.js';
+import { timestampText } from '../domain/timestamp.js';
 
 function safeLimit(value, fallback = 20, max = 100) {
   const n = Number(value);
@@ -22,6 +23,7 @@ export function createSessionService({
   adapter = null,
   archive = null,
   bootPack = null,
+  memoryMaintenance = null,
   config = DEFAULT_CONFIG,
   logger = () => {},
   now = () => Date.now(),
@@ -60,6 +62,9 @@ export function createSessionService({
       workspaceTitle: state.active?.workspaceTitle || '',
       bootPackAt: state.active?.bootPackAt || 0,
       bootPackStatus: state.active?.bootPackStatus || '',
+      lastTimestampTurn: state.active?.lastTimestampTurn || 0,
+      lastTimestampAt: state.active?.lastTimestampAt || 0,
+      timestampError: state.active?.timestampError || '',
       workspaceAttached: state.active?.workspaceAttached === true,
       currentDay: activeDay,
       recent: state.recent.length,
@@ -168,6 +173,59 @@ export function createSessionService({
     }
   }
 
+  /** 在 open step 内一次性注入开机包（可选）和本轮时间戳。 */
+  async function applyTurnContext(entry, { turn, step } = {}) {
+    const turnNo = Number(turn);
+    const stepNo = Number(step);
+    if (!adapter || typeof adapter.injectContext !== 'function') {
+      return { ...entry, bootPackStatus: entry.bootPackStatus === 'pending' ? 'skipped' : entry.bootPackStatus, bootPackError: 'adapter unavailable' };
+    }
+    const bootPending = entry.bootPackStatus === 'pending' || entry.bootPackStatus === 'injecting';
+    const timestampDue = options.timestamp?.enabled !== false
+      && stepNo === 1
+      && turnNo !== Number(entry.lastTimestampTurn || 0);
+    if (!bootPending && !timestampDue) return entry;
+
+    const bootText = bootPending
+      ? (bootPack ? bootPack.build({ day: entry.day, workspace: entry }) : '')
+      : '';
+    const parts = [];
+    if (bootText) parts.push(bootText);
+    if (timestampDue) parts.push(timestampText(now()));
+    const text = parts.filter(Boolean).join('\n\n');
+    if (!text) {
+      return {
+        ...entry,
+        ...(bootPending ? { bootPackStatus: 'skipped', bootPackAt: now(), bootPackChars: 0, bootPackError: 'boot pack unavailable' } : {}),
+        ...(timestampDue ? { timestampInjectingTurn: 0, timestampError: 'timestamp text empty' } : {}),
+      };
+    }
+
+    const injected = await adapter.injectContext(entry.sessionId, text, { turn: turnNo, step: stepNo });
+    if (injected?.skipped) {
+      return {
+        ...entry,
+        ...(bootPending ? { bootPackStatus: 'skipped', bootPackAt: now(), bootPackChars: 0, bootPackError: String(injected.reason || 'open turn/step 不可用') } : {}),
+        ...(timestampDue ? { timestampInjectingTurn: 0, timestampError: String(injected.reason || 'open turn/step 不可用') } : {}),
+      };
+    }
+    return {
+      ...entry,
+      ...(bootPending ? {
+        bootPackStatus: 'injected',
+        bootPackAt: now(),
+        bootPackChars: bootText.length,
+        bootPackError: '',
+      } : {}),
+      ...(timestampDue ? {
+        lastTimestampTurn: turnNo,
+        lastTimestampAt: now(),
+        timestampInjectingTurn: 0,
+        timestampError: '',
+      } : {}),
+    };
+  }
+
   /** 第一个 open step 到来时再注入，避免在 turn/start 之前写坏 DSH 会话。 */
   async function handleEvent(sessionId, event = {}) {
     const id = String(sessionId || '').trim();
@@ -176,39 +234,61 @@ export function createSessionService({
     if (type !== 'step/start') return null;
     const state = index.read();
     if (!state.active || state.active.sessionId !== id) return null;
-    if (state.active.bootPackStatus !== 'pending') return null;
     const data = event?.data || event?.event?.data || {};
     const turn = Number(data.turn);
     const step = Number(data.step);
     if (!Number.isSafeInteger(turn) || !Number.isSafeInteger(step) || turn < 0 || step < 0) return null;
 
-    // 先标记 injecting，避免同一个 step 的重复事件并发写入两条开机包。
-    const injecting = index.updateActive({
-      bootPackStatus: 'injecting',
-      bootPackError: '',
-    });
+    const active = state.active;
+    const bootPending = active.bootPackStatus === 'pending';
+    const timestampDue = options.timestamp?.enabled !== false
+      && step === 1
+      && turn !== Number(active.lastTimestampTurn || 0)
+      && turn !== Number(active.timestampInjectingTurn || 0);
+    if (!bootPending && !timestampDue) return null;
+
+    // 先写 injecting，避免同一个 step 的重复事件并发注入两次。
+    const patch = {};
+    if (bootPending) {
+      patch.bootPackStatus = 'injecting';
+      patch.bootPackError = '';
+    }
+    if (timestampDue) patch.timestampInjectingTurn = turn;
+    const injecting = index.updateActive(patch);
     if (!injecting) return null;
+
     try {
-      const updated = await applyBootPack(injecting, { turn, step });
-      return index.updateActive({
-        bootPackStatus: updated.bootPackStatus,
-        bootPackAt: updated.bootPackAt,
-        bootPackChars: updated.bootPackChars,
-        bootPackError: updated.bootPackError || '',
-        ...(updated.lastError ? { lastError: updated.lastError } : {}),
-      });
+      const updated = await applyTurnContext(injecting, { turn, step });
+      const next = {};
+      if (bootPending) {
+        next.bootPackStatus = updated.bootPackStatus;
+        next.bootPackAt = updated.bootPackAt;
+        next.bootPackChars = updated.bootPackChars;
+        next.bootPackError = updated.bootPackError || '';
+        if (updated.lastError) next.lastError = updated.lastError;
+      }
+      if (timestampDue) {
+        next.lastTimestampTurn = updated.lastTimestampTurn || injecting.lastTimestampTurn || 0;
+        next.lastTimestampAt = updated.lastTimestampAt || injecting.lastTimestampAt || 0;
+        next.timestampInjectingTurn = updated.timestampInjectingTurn || 0;
+        next.timestampError = updated.timestampError || '';
+      }
+      if (updated.timestampError) next.timestampError = updated.timestampError;
+      return index.updateActive(next);
     } catch (error) {
       const message = String(error?.message ?? error);
       // 事件 publish 期间 append 会被 DSH 拒绝；这是可重试状态，不要永久失败。
       const retryable = /cannot reenter|another append is being published/i.test(message);
-      logger(`开机包 step/start 注入${retryable ? '延后重试' : '失败'} ${id}：${message}`);
-      return index.updateActive({
-        bootPackStatus: retryable ? 'pending' : 'failed',
-        bootPackAt: 0,
-        bootPackChars: 0,
-        bootPackError: message,
-        ...(retryable ? {} : { lastError: message }),
-      });
+      logger(`开机包/时间戳 step/start 注入${retryable ? '延后重试' : '失败'} ${id}：${message}`);
+      const next = { timestampInjectingTurn: 0, timestampError: message };
+      if (bootPending) {
+        next.bootPackStatus = retryable ? 'pending' : 'failed';
+        next.bootPackAt = 0;
+        next.bootPackChars = 0;
+        next.bootPackError = message;
+        if (!retryable) next.lastError = message;
+      }
+      return index.updateActive(next);
     }
   }
 
@@ -246,6 +326,10 @@ export function createSessionService({
       bootPackChars: 0,
       bootPackStatus: 'pending',
       bootPackError: '',
+      lastTimestampTurn: 0,
+      lastTimestampAt: 0,
+      timestampInjectingTurn: 0,
+      timestampError: '',
       lastError: workspaceAttachError,
     };
     return entry;
@@ -396,6 +480,13 @@ export function createSessionService({
         attempts: Number(entry.attempts || 0) + 1,
         lastError: '',
       });
+      if (memoryMaintenance) {
+        try {
+          await memoryMaintenance({ day, digestPath: result.digestPath, sessionId: entry.sessionId });
+        } catch (error) {
+          logger(`夜间记忆整理失败 ${day}：${error?.message ?? error}`);
+        }
+      }
       logger(`日终整理完成：${day}（${result.count} 条消息）`);
       return { ...(updated || entry), ...result, skipped: Boolean(result.skipped) };
     })().catch((error) => {
