@@ -9,6 +9,7 @@
  * 不加载具体频道组件；那些以后作为可选组件接入。
  */
 import path from 'node:path';
+import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { createCore } from './core/index.js';
@@ -123,6 +124,25 @@ export function apply(ctx) {
       res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
       res.end(JSON.stringify(value));
     } catch {}
+  }
+
+  function readConfigFile() {
+    try {
+      return JSON.parse(fs.readFileSync(core.paths.configFile, 'utf8')) || {};
+    } catch {
+      return {};
+    }
+  }
+
+  function writeIdleConfig(idleClock) {
+    const file = core.paths.configFile;
+    const current = readConfigFile();
+    const next = { ...current, idleClock };
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
+    fs.writeFileSync(tmp, `${JSON.stringify(next, null, 2)}\n`, 'utf8');
+    fs.renameSync(tmp, file);
+    return next;
   }
 
   function isLoopback(req) {
@@ -286,6 +306,20 @@ export function apply(ctx) {
       json(res, 200, core.idle.status());
       return;
     }
+    if (pathname === `${API_PREFIX}/idle/config` && req.method === 'GET') {
+      json(res, 200, { ok: true, idleClock: core.idle.config });
+      return;
+    }
+    if (pathname === `${API_PREFIX}/idle/config` && req.method === 'POST') {
+      const body = await readBody(req);
+      const patch = body?.idleClock && typeof body.idleClock === 'object' ? body.idleClock : body;
+      const result = core.idle.configure(patch || {});
+      writeIdleConfig(result.config);
+      scheduleIdleTimer();
+      core.log(`空闲钟配置已更新：enabled=${result.config.enabled}`);
+      json(res, 200, { ok: true, ...result.status });
+      return;
+    }
     if (pathname === `${API_PREFIX}/idle/preview` && req.method === 'GET') {
       json(res, 200, core.idle.preview());
       return;
@@ -347,6 +381,18 @@ export function apply(ctx) {
   let bootstrapTimer = null;
   let dayTimer = null;
   let idleTimer = null;
+
+  function scheduleIdleTimer() {
+    try { if (idleTimer) clearInterval(idleTimer); } catch {}
+    idleTimer = null;
+    if (!sessionAdapter) return;
+    const interval = Math.max(30_000, Number(core.idle.config.checkIntervalMs) || 5 * 60 * 1000);
+    idleTimer = setInterval(() => {
+      core.idle.check().catch((error) => core.log(`空闲钟检查失败：${error?.message ?? error}`));
+    }, interval);
+    idleTimer.unref?.();
+  }
+
   if (sessionAdapter) {
     bootstrapTimer = setTimeout(() => {
       core.session.bootstrap().catch((error) => core.log(`启动日会话失败：${error?.message ?? error}`));
@@ -356,10 +402,7 @@ export function apply(ctx) {
       core.session.ensureToday().catch((error) => core.log(`日会话检查失败：${error?.message ?? error}`));
     }, 5 * 60 * 1000);
     dayTimer.unref?.();
-    idleTimer = setInterval(() => {
-      core.idle.check().catch((error) => core.log(`空闲钟检查失败：${error?.message ?? error}`));
-    }, Math.max(30_000, Number(core.idle.config.checkIntervalMs) || 5 * 60 * 1000));
-    idleTimer.unref?.();
+    scheduleIdleTimer();
   }
 
   if (typeof ctx.effect === 'function') {

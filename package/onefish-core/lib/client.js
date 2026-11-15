@@ -40,6 +40,9 @@ window.__ModuleLoader__.load({
       const [draft, setDraft] = useState("");
       const [memories, setMemories] = useState([]);
       const [sessions, setSessions] = useState(null);
+      const [idle, setIdle] = useState(null);
+      const [idleDraft, setIdleDraft] = useState(null);
+      const [idlePreview, setIdlePreview] = useState("");
       const [bootPreview, setBootPreview] = useState("");
       const [newText, setNewText] = useState("");
       const [newTier, setNewTier] = useState("active");
@@ -50,17 +53,20 @@ window.__ModuleLoader__.load({
       const load = useCallback(async () => {
         setError("");
         try {
-          const [o, p, m, s] = await Promise.all([
+          const [o, p, m, s, i] = await Promise.all([
             api("/overview"),
             api("/persona"),
             api("/memory?limit=50"),
             api("/sessions"),
+            api("/idle/status"),
           ]);
           setOverview(o);
           setPersona(p);
           setDraft(p.text || "");
           setMemories(m.entries || []);
           setSessions(s);
+          setIdle(i);
+          setIdleDraft((prev) => prev || i.config || null);
         } catch (e) {
           setError(String(e?.message || e));
         }
@@ -128,7 +134,59 @@ window.__ModuleLoader__.load({
         }
       }
 
-      const tabs = [["overview", "概览"], ["persona", "人格"], ["memory", "记忆"], ["session", "会话"]];
+      function idleField(key, value, multiplier = 1) {
+        setIdleDraft((prev) => ({ ...(prev || {}), [key]: Number(value) * multiplier }));
+      }
+
+      async function saveIdle() {
+        if (!idleDraft) return;
+        setBusy("idle");
+        setError("");
+        setNotice("");
+        try {
+          const saved = await api("/idle/config", {
+            method: "POST",
+            body: JSON.stringify({ idleClock: idleDraft }),
+          });
+          setIdle(saved);
+          setIdleDraft(saved.config || idleDraft);
+          setNotice("空闲钟配置已保存，立即生效");
+        } catch (e) {
+          setError(String(e?.message || e));
+        } finally {
+          setBusy("");
+        }
+      }
+
+      async function previewIdle() {
+        setBusy("idle-preview");
+        setError("");
+        try {
+          const data = await api("/idle/preview");
+          setIdlePreview(String(data.text || ""));
+        } catch (e) {
+          setError(String(e?.message || e));
+        } finally {
+          setBusy("");
+        }
+      }
+
+      async function runIdle() {
+        setBusy("idle-run");
+        setError("");
+        setNotice("");
+        try {
+          const data = await api("/idle/run", { method: "POST" });
+          setNotice(data.fired ? "空闲 prompt 已触发" : `未触发：${data.reason || "未知原因"}`);
+          await load();
+        } catch (e) {
+          setError(String(e?.message || e));
+        } finally {
+          setBusy("");
+        }
+      }
+
+      const tabs = [["overview", "概览"], ["persona", "人格"], ["memory", "记忆"], ["idle", "空闲钟"], ["session", "会话"]];
 
       function row(labelText, value) {
         return h("div", { style: { display: "flex", justifyContent: "space-between", gap: "12px", padding: "5px 0", borderBottom: ".5px solid var(--dsw-alias-border-l2)", fontSize: "12px" } },
@@ -179,6 +237,44 @@ window.__ModuleLoader__.load({
                 h("button", { style: { ...btn2, padding: "2px 8px" }, disabled: busy === item.id, onClick: () => deleteMemory(item.id) }, "删除"))))));
       }
 
+      function renderIdle() {
+        if (!idleDraft) return h("div", { style: label }, "加载中…");
+        const c = idleDraft;
+        const field = (text, key, opts = {}) => h("label", { style: { display: "flex", flexDirection: "column", gap: "4px", fontSize: "12px" } },
+          h("span", { style: label }, text),
+          h("input", {
+            ...input,
+            type: "number",
+            min: opts.min ?? 0,
+            step: opts.step ?? 1,
+            value: opts.minutes ? Math.round(Number(c[key] || 0) / 60000) : (c[key] ?? 0),
+            onChange: (e) => idleField(key, e.target.value, opts.minutes ? 60000 : 1),
+          }));
+        const idleMinutes = Math.round(Number(idle?.idleMs || 0) / 60000);
+        return h("div", null,
+          h("div", { style: { ...card, marginBottom: "10px" } },
+            h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px" } },
+              h("div", null,
+                h("div", { style: { fontWeight: 600, marginBottom: "3px" } }, "空闲钟"),
+                h("div", { style: label }, `当前已空闲 ${idleMinutes} 分钟 · 会话 ${idle?.active ? "active" : "无"} · ${idle?.enabled ? "已启用" : "已关闭"}`)),
+              h("label", { style: { display: "flex", alignItems: "center", gap: "6px", fontSize: "12.5px" } },
+                h("input", { type: "checkbox", checked: c.enabled === true, onChange: (e) => setIdleDraft({ ...c, enabled: e.target.checked }) }),
+                "启用")),
+            h("div", { style: { ...label, marginTop: "6px" } }, "空闲时钟是主动 prompt，不是任务；默认关闭，避免突然打扰。")),
+          h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: "10px" } },
+            field("最小空闲（分钟）", "minIdleMs", { minutes: true, min: 0, step: 1 }),
+            field("概率尺度（小时）", "scaleHours", { min: 0.25, step: 0.25 }),
+            field("曲线形状", "shape", { min: 0.25, step: 0.25 }),
+            field("冷却最短（分钟）", "cooldownMinMs", { minutes: true, min: 0, step: 1 }),
+            field("冷却最长（分钟）", "cooldownMaxMs", { minutes: true, min: 0, step: 1 }),
+            field("检查间隔（分钟）", "checkIntervalMs", { minutes: true, min: 1, step: 1 })),
+          h("div", { style: { display: "flex", gap: "8px", marginTop: "10px", flexWrap: "wrap" } },
+            h("button", { style: btn, disabled: busy === "idle", onClick: saveIdle }, busy === "idle" ? "保存中…" : "保存空闲钟配置"),
+            h("button", { style: btn2, disabled: busy === "idle-preview", onClick: previewIdle }, busy === "idle-preview" ? "读取中…" : "预览 prompt"),
+            h("button", { style: btn2, disabled: busy === "idle-run", onClick: runIdle }, busy === "idle-run" ? "触发中…" : "立即触发一次")),
+          idlePreview ? h("pre", { style: { ...card, whiteSpace: "pre-wrap", wordBreak: "break-word", marginTop: "10px", fontSize: "12px", lineHeight: "18px" } }, idlePreview) : null);
+      }
+
       function renderSession() {
         if (!sessions) return h("div", { style: label }, "加载中…");
         const rows = sessions.recent || [];
@@ -217,7 +313,8 @@ window.__ModuleLoader__.load({
           tab === "overview" ? renderOverview()
             : tab === "persona" ? renderPersona()
               : tab === "memory" ? renderMemory()
-                : renderSession()));
+                : tab === "idle" ? renderIdle()
+                  : renderSession()));
     }
 
     const NAMES = { nav: "OneFish" };

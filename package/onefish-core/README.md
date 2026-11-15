@@ -70,6 +70,7 @@ npm run setup
 - 纯概率曲线：空闲越久越可能触发，触发后随机冷却；
 - 状态持久化到 `core/idle-clock.json`；
 - 默认 `enabled: false`，启用后会向当前日会话发一条主动 prompt；
+- 设置页「空闲钟」可直接配置启用、最小空闲、概率尺度/形状、冷却和检查间隔，保存后立即生效并写入 `core/config.json`；
 - 可配 `minIdleMs`、`scaleHours`、`shape`、`cooldownMinMs`、`cooldownMaxMs`。
 
 ```json
@@ -83,7 +84,7 @@ npm run setup
 }
 ```
 
-接口：`GET /dsh-onefish-core/api/idle/status`、`GET /idle/preview`、`POST /idle/run`。
+接口：`GET /dsh-onefish-core/api/idle/status`、`GET /idle/preview`、`POST /idle/run`、`GET|POST /idle/config`。
 MCP：`idle_status`、`idle_preview`。
 
 ## 记忆维护

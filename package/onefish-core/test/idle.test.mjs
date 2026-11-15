@@ -38,6 +38,10 @@ const idle = createIdleClockService({
 const status = idle.status();
 assert.equal(status.enabled, true);
 assert.match(idle.preview().text, /【空闲】/);
+const configured = idle.configure({ enabled: true, minIdleMs: 120_000, scaleHours: 2 });
+assert.equal(configured.config.minIdleMs, 120_000);
+assert.equal(configured.config.scaleHours, 2);
+assert.equal(idle.config.minIdleMs, 120_000);
 const fired = await idle.check();
 assert.equal(fired.fired, true);
 assert.equal(prompts.length, 1);

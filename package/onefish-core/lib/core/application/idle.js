@@ -24,7 +24,7 @@ export function createIdleClockService({
   if (!store) throw new Error('idle store is required');
   if (!session) throw new Error('session service is required');
   const options = { ...DEFAULT_CONFIG, ...config };
-  const cfg = normalizeIdleClock(options.idleClock || {});
+  let cfg = normalizeIdleClock(options.idleClock || {});
   let busy = false;
 
   function currentDay() {
@@ -71,6 +71,12 @@ export function createIdleClockService({
       state,
       config: cfg,
     };
+  }
+
+  /** 设置页保存后立即生效；下一次 check 使用新配置。 */
+  function configure(patch = {}) {
+    cfg = normalizeIdleClock({ ...cfg, ...(patch && typeof patch === 'object' ? patch : {}) });
+    return { ok: true, config: cfg, status: status() };
   }
 
   function preview() {
@@ -128,5 +134,12 @@ export function createIdleClockService({
     }
   }
 
-  return { status, preview, check, buildPrompt, config: cfg };
+  return {
+    status,
+    preview,
+    check,
+    buildPrompt,
+    configure,
+    get config() { return cfg; },
+  };
 }
