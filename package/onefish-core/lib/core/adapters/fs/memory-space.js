@@ -243,10 +243,10 @@ export function createMemorySpace({ memoryDir, spaceDir, importantFile, kbFile, 
   function activeBlock({ maxChars = 500, limit = 8, now = Date.now() } = {}) {
     // 迁移进来的旧 important 质量参差：先留在空间里可见，但不自动注入；
     // 由主人/整理器决定升 core 或改成 active。
-    const rows = list({ tier: 'active', limit: 0 }).filter((r) => r.space !== 'legacy' && r.meta?.dormant !== true);
+    const rows = list({ tier: 'active', limit: 0 }).filter((r) => r.space !== 'legacy' && r.meta?.legacyMemoryCard !== true && r.meta?.dormant !== true);
     const scored = rows.map((r) => ({
       r,
-      score: memoryScore(r, { now }),
+      score: memoryScore(r, { now }) + (r.kind === 'commitment' || r.kind === 'open_loop' ? 0.12 : 0),
     })).sort((a, b) => b.score - a.score);
     const lines = [];
     let used = 0;

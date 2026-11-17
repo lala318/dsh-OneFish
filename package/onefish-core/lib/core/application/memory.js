@@ -64,41 +64,39 @@ export function createMemoryService({ store, persona, logger = () => {}, vectorF
         }
       }
     }
+    // relevance only gates candidates; ranking blends relevance with memoryScore.
+    const terms = q.split(/[^\p{L}\p{N}]+/u).map((term) => term.trim()).filter(Boolean);
     const byId = new Map();
-    for (const row of rows) {
+    const relevanceOf = (row) => {
+      if (!terms.length) return 0;
+      const haystack = `${row.text} ${(row.tags || []).join(' ')}`;
+      const matched = terms.filter((term) => haystack.includes(term)).length;
+      return matched / terms.length;
+    };
+    const addCandidate = (row, relevance, source) => {
+      const current = byId.get(row.id);
+      const next = Math.max(current?.relevance || 0, relevance);
       byId.set(row.id, {
         id: row.id,
         tier: row.tier,
         kind: row.kind,
         text: row.text,
-        tags: row.tags,
+        tags: row.tags || [],
         importance: row.importance,
         updatedAt: row.updatedAt,
         retention: retentionOf(row),
-        score: memoryScore(row),
-        source: 'lexical',
+        relevance: next,
+        score: 0.6 * next + 0.4 * memoryScore(row),
+        source: current && current.source !== source ? 'hybrid' : source,
       });
-    }
-    for (const hit of vectorHits) {
-      if (tier && hit.tier !== tier) continue;
-      const current = byId.get(hit.id);
-      if (!current) {
-        byId.set(hit.id, {
-          id: hit.id,
-          tier: hit.tier,
-          kind: hit.kind,
-          text: hit.text,
-          tags: [],
-          importance: hit.importance,
-          updatedAt: hit.at,
-          retention: hit.retention,
-          score: hit.score,
-          source: 'vector',
-        });
-      } else {
-        current.score = Math.max(current.score, hit.score);
-        current.source = 'hybrid';
-        current.retention = Math.max(current.retention || 0, hit.retention || 0);
+    };
+    for (const row of rows) addCandidate(row, relevanceOf(row), 'lexical');
+    if (vectorHits.length) {
+      const entriesById = new Map(s.list({ tier, limit: 0 }).map((row) => [row.id, row]));
+      for (const hit of vectorHits) {
+        if (tier && hit.tier !== tier) continue;
+        const row = entriesById.get(hit.id);
+        if (row) addCandidate(row, Number(hit.cos) || 0, 'vector');
       }
     }
     return [...byId.values()].sort((a, b) => b.score - a.score).slice(0, limit);
