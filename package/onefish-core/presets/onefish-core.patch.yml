@@ -58,3 +58,14 @@
                   thresholdChars: 50000
                   headChars: 45000
                   tailChars: 2000
+
+          - id: tool-subagent
+            name: '@deepseek-ai/dsh-tool-subagent'
+            config:
+              provider: spawn
+              toolName: subagent
+
+          - id: tool-subagent-control
+            name: '@deepseek-ai/dsh-tool-subagent-control'
+            config:
+              interrupt: false
