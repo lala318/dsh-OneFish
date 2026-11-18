@@ -80,8 +80,16 @@ try {
   assert.equal(first.bootPackStatus, 'pending');
   assert.equal(adapter.injected.length, 0);
 
-  const injected = await core.session.handleEvent('session-test-1', {
+  const deferred = await core.session.handleEvent('session-test-1', {
     type: 'step/start',
+    data: { turn: 1, step: 1 },
+  });
+  assert.equal(deferred, null);
+  assert.equal(core.session.current().bootPackStatus, 'pending');
+  assert.equal(adapter.injected.length, 0, 'system/message 之前不能写任何 surface 消息');
+
+  const injected = await core.session.handleEvent('session-test-1', {
+    type: 'system/message',
     data: { turn: 1, step: 1 },
   });
   assert.ok(injected.bootPackAt > 0);
@@ -128,6 +136,11 @@ try {
   assert.equal(adapter.injected.length, 2);
   await core.session.handleEvent('session-test-2', {
     type: 'step/start',
+    data: { turn: 1, step: 1 },
+  });
+  assert.equal(adapter.injected.length, 2, '首轮仍要等 system/message');
+  await core.session.handleEvent('session-test-2', {
+    type: 'system/message',
     data: { turn: 1, step: 1 },
   });
   assert.equal(adapter.injected.length, 3);

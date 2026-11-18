@@ -34,6 +34,8 @@ export function createSessionService({
   const options = { ...DEFAULT_CONFIG, ...config };
   let ensureInflight = null;
   const consolidateInflight = new Map();
+  // 只在本进程里盯住首轮：system/message 落盘前不许写 developer/message。
+  const surfaceReady = new Set();
 
   function currentDay() {
     return dayKeyOf(now(), { rolloverHour: options.rolloverHour });
@@ -227,12 +229,12 @@ export function createSessionService({
     };
   }
 
-  /** 第一个 open step 到来时再注入，避免在 turn/start 之前写坏 DSH 会话。 */
+  /** 首轮等 system/message 落盘后再注入开机包和时间戳，避免在它之前写坏 DSH 会话。 */
   async function handleEvent(sessionId, event = {}) {
     const id = String(sessionId || '').trim();
     if (!id) return null;
     const type = String(event?.type || event?.event?.type || '').trim();
-    if (type !== 'step/start') return null;
+    if (type !== 'step/start' && type !== 'system/message') return null;
     const state = index.read();
     if (!state.active || state.active.sessionId !== id) return null;
     const data = event?.data || event?.event?.data || {};
@@ -242,6 +244,10 @@ export function createSessionService({
 
     const active = state.active;
     const bootPending = active.bootPackStatus === 'pending';
+    // DSH 要求 system/message 是会话 surface 的第一条；首轮先等它落下来，
+    // 否则日志冷加载会报 system/message requires a protected first surface head。
+    if (type === 'system/message') surfaceReady.add(id);
+    if (type === 'step/start' && turn <= 1 && !surfaceReady.has(id)) return null;
     const timestampDue = options.timestamp?.enabled !== false
       && step === 1
       && turn !== Number(active.lastTimestampTurn || 0)
