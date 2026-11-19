@@ -1,0 +1,13 @@
+# ============================================================================
+# onefish-component-bili —— B站频道组件 bundle patch
+# ============================================================================
+# 这里只注册组件宿主插件（私信 / 评论收件箱轮询 → OneFish Core）。
+#
+# bili_* MCP server 需要本机 node.exe 与 lib/mcp.mjs 的绝对路径，不能写成静态
+# 相对路径；因此由 scripts/setup-dsh.mjs 幂等写入 DSH profile 的
+# cordis.patch.yml（与 onefish-core / onefish-component-qq 的安装方式一致）。
+# ============================================================================
+- insert:
+    - id: onefish-component-bili
+      name: onefish-component-bili
+      config: {}

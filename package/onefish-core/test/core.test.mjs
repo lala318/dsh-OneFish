@@ -12,6 +12,11 @@ import { pathToFileURL } from 'node:url';
 import yaml from 'js-yaml';
 import { createCore } from '../lib/core/index.js';
 
+// DSH 的 preset / cordis patch 支持 !!js 表达式标签，js-yaml 4 默认不认识；
+// 这里把它当原始字符串收下，测试只校验结构，不求值。
+const jsExprType = new yaml.Type('tag:yaml.org,2002:js', { kind: 'scalar', construct: (data) => data });
+const dshSchema = yaml.DEFAULT_SCHEMA.extend([jsExprType]);
+
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '../..');
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'onefish-core-test-'));
 
@@ -86,12 +91,12 @@ try {
   assert.ok(routes.some((route) => route.path === '/dsh-onefish-core/api'));
 
   // preset / bundle patch YAML 结构
-  const preset = yaml.load(fs.readFileSync(path.join(root, 'onefish-core/presets/onefish-core.patch.yml'), 'utf8'));
+  const preset = yaml.load(fs.readFileSync(path.join(root, 'onefish-core/presets/onefish-core.patch.yml'), 'utf8'), { schema: dshSchema });
   const presetRow = preset?.[0]?.insert?.[0];
   assert.equal(presetRow?.config?.id, 'onefish-core');
   assert.ok(Array.isArray(presetRow?.config?.plugins));
   assert.ok(presetRow.config.plugins.some((row) => row.id === 'persona'));
-  const bundle = yaml.load(fs.readFileSync(path.join(root, 'onefish-core/cordis.patch.yml'), 'utf8'));
+  const bundle = yaml.load(fs.readFileSync(path.join(root, 'onefish-core/cordis.patch.yml'), 'utf8'), { schema: dshSchema });
   assert.equal(bundle?.[0]?.insert?.[0]?.id, 'onefish-core');
 
   console.log('✅ OneFish Core 测试通过');
