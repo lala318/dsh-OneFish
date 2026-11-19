@@ -112,7 +112,7 @@ export function createBiliComponent(options = {}) {
     const createComments = typeof options.createComments === 'function' ? options.createComments : createCommentApi;
     client = createClient(cred, { logger });
     dmApi = createDm(client, { config, logger });
-    commentApi = createComments(client, { logger });
+    commentApi = createComments(client, { config, logger });
     return true;
   }
 

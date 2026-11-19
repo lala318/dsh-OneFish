@@ -129,11 +129,22 @@ function commentUrl(bvid, rpid) {
  * @param {object} client createBiliClient() 的返回值（getJson / postForm / signedQuery）
  * @param {{logger?:Function}} options logger 只用于降级/异常提示，不打印凭据
  */
-export function createCommentApi(client, { logger = () => {} } = {}) {
+export function createCommentApi(client, { logger = () => {}, config = {} } = {}) {
   if (!client || typeof client.getJson !== 'function' || typeof client.postForm !== 'function') {
     throw new Error('createCommentApi 需要一个客户端（createBiliClient() 的返回值，含 getJson / postForm）');
   }
   const log = typeof logger === 'function' ? logger : () => {};
+
+  /** 顶层评论必须 @ 主人（2026-11-19 的规矩）；楼中楼回复不乱 @。 */
+  function withOwnerMention(text, { root = 0, parent = 0 } = {}) {
+    const name = str(config?.owner?.name);
+    if (!name) return text;
+    if (config?.outbound?.mentionOwner === false) return text;
+    const isReply = String(root ?? '0') !== '0' || String(parent ?? '0') !== '0';
+    if (isReply) return text;
+    if (text.includes(`@${name}`)) return text;
+    return `@${name} ${text}`;
+  }
 
   /**
    * 拉收件箱：kind = 'reply'（回复我的）| 'at'（@我的）。
@@ -248,8 +259,9 @@ export function createCommentApi(client, { logger = () => {} } = {}) {
   async function post({ oid, type = 1, message, root = 0, parent = 0, bvid = '' } = {}) {
     const oidText = str(oid);
     if (!oidText) throw new Error('发评论缺少 oid');
-    const text = String(message ?? '');
-    if (!text.trim()) throw new Error('发评论缺少正文 message');
+    const rawText = String(message ?? '');
+    if (!rawText.trim()) throw new Error('发评论缺少正文 message');
+    const text = withOwnerMention(rawText, { root, parent });
     const typeNum = commentType(type);
     const referer = refererFor(typeNum, oidText);
     const fields = {

@@ -64,7 +64,7 @@ function apis() {
     config,
     cred,
     dm: createDmApi(client, { config }),
-    comments: createCommentApi(client),
+    comments: createCommentApi(client, { config }),
     video: createVideoApi(client, { config }),
   };
 }

@@ -12,6 +12,7 @@ import { normalizeConfig, readConfigFile, writeConfigFile, resolveConfigFile, co
 import { loadCredentials, credentialsStatus, cookieHeader } from '../lib/credentials.js';
 import { wbiQuery } from '../lib/http.js';
 import { parseDmContent, normalizeSession, createDmApi } from '../lib/dm.js';
+import { createCommentApi } from '../lib/comments.js';
 
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'onefish-bili-test-'));
 process.on('exit', () => {
@@ -108,6 +109,30 @@ function fakeClient({ sessions = [], sendResult = { httpStatus: 200, code: 0, me
     },
   };
 }
+
+test('评论 @ 规则：顶层自动 @ 主人，楼中楼不乱 @，已有 @ 不重复', async () => {
+  const calls = [];
+  const client = {
+    async getJson() { return {}; },
+    async postForm(url, fields) {
+      calls.push(fields);
+      return { httpStatus: 200, code: 0, message: '', data: { rpid_str: String(calls.length) } };
+    },
+  };
+  const api = createCommentApi(client, { config: { owner: { name: 'lngsng' }, outbound: { mentionOwner: true } } });
+  await api.post({ oid: '123', message: '这条视频有点意思' });
+  assert.equal(calls[0].message, '@lngsng 这条视频有点意思');
+
+  await api.post({ oid: '123', message: '@lngsng 手动 @ 过了' });
+  assert.equal(calls[1].message, '@lngsng 手动 @ 过了');
+
+  await api.post({ oid: '123', message: '回你一句', root: '9', parent: '10' });
+  assert.equal(calls[2].message, '回你一句', '楼中楼不自动 @');
+
+  const off = createCommentApi(client, { config: { owner: { name: 'lngsng' }, outbound: { mentionOwner: false } } });
+  await off.post({ oid: '123', message: '关掉就原样' });
+  assert.equal(calls[3].message, '关掉就原样');
+});
 
 test('私信发送规则：主人直发、陌生人只回、系统号拒绝、超长拒绝', async () => {
   const sessions = [
