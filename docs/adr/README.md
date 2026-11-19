@@ -10,6 +10,7 @@
 | [0004](0004-boot-pack.md) | 日会话首轮注入开机包 | Accepted |
 | [0005](0005-component-contract.md) | Component Contract v1：组件边界与消息信封 | Accepted |
 | [0006](0006-rhythm-and-memory.md) | 对话节奏、空闲钟与记忆维护 | Accepted |
+| [0007](0007-memory-recall.md) | 每轮记忆召回 | Accepted |
 
 约定：
 

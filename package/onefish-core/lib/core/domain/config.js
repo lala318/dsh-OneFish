@@ -19,6 +19,20 @@ export const DEFAULT_CONFIG = Object.freeze({
   historyPageMessages: 200,
   historyMaxPages: 50,
   timestamp: { enabled: true },
+  // 每轮自动召回：不等待向量模型，用本地词面匹配（中文按二元组），避免把回复拖慢。
+  recall: {
+    enabled: true,
+    topK: 3,
+    minScore: 0.6,
+    minRelevance: 0.4,
+    lexicalMinScore: 0.35,
+    timeoutMs: 600,
+    maxChars: 600,
+    minQueryChars: 6,
+    maxQueryChars: 800,
+    skipPrefixes: ['【空闲】', '【开机包】', '【记忆召回】'],
+    skipFirstTurn: true,
+  },
   embedding: { runtimeDir: '', modelDir: '' },
   idleClock: {
     enabled: false,
@@ -60,6 +74,32 @@ export function normalizeConfig(raw = {}) {
       ...DEFAULT_CONFIG.timestamp,
       ...(source.timestamp && typeof source.timestamp === 'object' ? source.timestamp : {}),
       enabled: !(source.timestamp && source.timestamp.enabled === false),
+    },
+    recall: {
+      ...DEFAULT_CONFIG.recall,
+      ...(source.recall && typeof source.recall === 'object' ? source.recall : {}),
+      enabled: !(source.recall && source.recall.enabled === false),
+      topK: clampInt(source.recall?.topK, DEFAULT_CONFIG.recall.topK, 1, 6),
+      minScore: (() => {
+        const n = Number(source.recall?.minScore);
+        return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : DEFAULT_CONFIG.recall.minScore;
+      })(),
+      lexicalMinScore: (() => {
+        const n = Number(source.recall?.lexicalMinScore);
+        return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : DEFAULT_CONFIG.recall.lexicalMinScore;
+      })(),
+      minRelevance: (() => {
+        const n = Number(source.recall?.minRelevance);
+        return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : DEFAULT_CONFIG.recall.minRelevance;
+      })(),
+      timeoutMs: clampInt(source.recall?.timeoutMs, DEFAULT_CONFIG.recall.timeoutMs, 100, 5000),
+      maxChars: clampInt(source.recall?.maxChars, DEFAULT_CONFIG.recall.maxChars, 200, 2000),
+      minQueryChars: clampInt(source.recall?.minQueryChars, DEFAULT_CONFIG.recall.minQueryChars, 2, 200),
+      maxQueryChars: clampInt(source.recall?.maxQueryChars, DEFAULT_CONFIG.recall.maxQueryChars, 100, 4000),
+      skipPrefixes: Array.isArray(source.recall?.skipPrefixes)
+        ? source.recall.skipPrefixes.map((item) => String(item)).filter(Boolean).slice(0, 10)
+        : DEFAULT_CONFIG.recall.skipPrefixes,
+      skipFirstTurn: source.recall?.skipFirstTurn !== false,
     },
     embedding: {
       runtimeDir: typeof source.embedding?.runtimeDir === 'string' ? source.embedding.runtimeDir.trim() : '',

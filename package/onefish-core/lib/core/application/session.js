@@ -11,6 +11,7 @@
 import { dayKeyOf, normalizeDayKey } from '../domain/day.js';
 import { DEFAULT_CONFIG } from '../domain/config.js';
 import { timestampText } from '../domain/timestamp.js';
+import { userMessageText } from './recall.js';
 
 function safeLimit(value, fallback = 20, max = 100) {
   const n = Number(value);
@@ -23,6 +24,7 @@ export function createSessionService({
   adapter = null,
   archive = null,
   bootPack = null,
+  recall = null,
   memoryMaintenance = null,
   memoryConsolidator = null,
   config = DEFAULT_CONFIG,
@@ -36,6 +38,11 @@ export function createSessionService({
   const consolidateInflight = new Map();
   // 只在本进程里盯住首轮：system/message 落盘前不许写 developer/message。
   const surfaceReady = new Set();
+  // 每个会话最近一次打开的 turn/step：user/message 自带的事件里没有 turn/step，
+  // 召回注入时要用这一个；进程重启后由下一个 step/start 重新学习。
+  const openStep = new Map();
+  // 每轮最多注入一次召回；同一 turn 里后续 step 不再插。
+  const recallTurn = new Map();
 
   function currentDay() {
     return dayKeyOf(now(), { rolloverHour: options.rolloverHour });
@@ -230,16 +237,71 @@ export function createSessionService({
   }
 
   /** 首轮等 system/message 落盘后再注入开机包和时间戳，避免在它之前写坏 DSH 会话。 */
+  /**
+   * 用户消息落地后，把最相关的旧记忆补一条 developer/message 到当前 open step。
+   * 纯同步打分（不走向量），注入失败只记日志，不影响这一轮回复。
+   */
+  async function applyRecall(sessionId, data = {}) {
+    if (!recall || typeof recall.build !== 'function') return null;
+    if (!adapter || typeof adapter.injectContext !== 'function') return null;
+    const text = userMessageText({ data });
+    let built = null;
+    try {
+      const timeoutMs = Math.max(100, Number(options.recall?.timeoutMs) || 600);
+      built = await Promise.race([
+        recall.build({ text }),
+        new Promise((resolve) => {
+          const timer = setTimeout(() => resolve({ text: '', items: [], reason: 'timeout' }), timeoutMs);
+          if (typeof timer.unref === 'function') timer.unref();
+        }),
+      ]);
+    } catch (error) {
+      logger(`记忆召回构建失败：${error?.message ?? error}`);
+      return null;
+    }
+    if (!built?.text) return null;
+    const open = openStep.get(sessionId);
+    if (!open) return null;
+    const turnNo = Number(open.turn);
+    if (options.recall?.skipFirstTurn !== false && turnNo <= 1) return null;
+    if (recallTurn.get(sessionId) === turnNo) return null;
+    try {
+      const injected = await adapter.injectContext(sessionId, built.text, { turn: turnNo, step: Number(open.step) });
+      if (injected?.skipped) {
+        logger(`记忆召回跳过：${sessionId} ${injected.reason || 'open turn/step 不可用'}`);
+        return null;
+      }
+      recallTurn.set(sessionId, turnNo);
+      index.updateActive({
+        lastRecallTurn: turnNo,
+        lastRecallAt: now(),
+        lastRecallChars: built.text.length,
+        lastRecallError: '',
+      });
+      logger(`记忆召回已注入：turn ${turnNo} / ${built.items?.length || 0} 条`);
+      return injected;
+    } catch (error) {
+      const message = String(error?.message ?? error);
+      index.updateActive({ lastRecallError: message });
+      logger(`记忆召回注入失败：${message}`);
+      return null;
+    }
+  }
+
   async function handleEvent(sessionId, event = {}) {
     const id = String(sessionId || '').trim();
     if (!id) return null;
     const type = String(event?.type || event?.event?.type || '').trim();
-    if (type !== 'step/start' && type !== 'system/message') return null;
     const state = index.read();
     if (!state.active || state.active.sessionId !== id) return null;
     const data = event?.data || event?.event?.data || {};
     const turn = Number(data.turn);
     const step = Number(data.step);
+    if (type === 'step/start' && Number.isSafeInteger(turn) && turn >= 0 && Number.isSafeInteger(step) && step >= 0) {
+      openStep.set(id, { turn, step });
+    }
+    if (type === 'user/message') return applyRecall(id, data);
+    if (type !== 'step/start' && type !== 'system/message') return null;
     if (!Number.isSafeInteger(turn) || !Number.isSafeInteger(step) || turn < 0 || step < 0) return null;
 
     const active = state.active;

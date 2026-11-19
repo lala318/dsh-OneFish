@@ -23,6 +23,7 @@ import { createArchiveService } from './adapters/fs/archive.js';
 import { createComponentStore } from './adapters/fs/component-store.js';
 import { createIdleStore } from './adapters/fs/idle-store.js';
 import { createBootPackService } from './application/boot-pack.js';
+import { createRecallService } from './application/recall.js';
 import { createComponentRegistry } from './application/components.js';
 import { createIdleClockService } from './application/idle.js';
 import { DEFAULT_CONFIG } from './domain/config.js';
@@ -65,11 +66,20 @@ export function createCore({
   });
   const archive = createArchiveService({ paths, logger });
   const bootPack = createBootPackService({ persona, memory, archive, config, now });
+  const recall = createRecallService({ memory, config, logger });
+  // 预热 embedding：第一次向量检索要加载本地模型，放到后台，别等第一轮召回时才卡。
+  try {
+    const warm = setTimeout(() => {
+      Promise.resolve(memory.search('预热', { k: 1 })).catch(() => {});
+    }, 2000);
+    if (typeof warm.unref === 'function') warm.unref();
+  } catch {}
   const session = createSessionService({
     sessionIndex,
     adapter: sessionAdapter,
     archive,
     bootPack,
+    recall,
     memoryMaintenance: ({ day }) => memory.maintain({ day }),
     memoryConsolidator,
     config,
@@ -118,7 +128,7 @@ export function createCore({
     try { logger(line); } catch {}
   }
 
-  return { paths, config, persona, memory, session, archive, bootPack, idle, embedding, components, componentApi, health, log };
+  return { paths, config, persona, memory, session, archive, bootPack, recall, idle, embedding, components, componentApi, health, log };
 }
 
 export { createCorePaths, resolveCoreHome } from './adapters/fs/paths.js';

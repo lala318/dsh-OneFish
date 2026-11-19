@@ -170,6 +170,15 @@ export function createMemoryService({ store, persona, logger = () => {}, vectorF
     }));
   }
 
+  /** 自动召回用的候选池：全部生效条目，不做截断（本地词面打分在 recall 服务里）。 */
+  function recallCandidates({ tier = '' } = {}) {
+    return space().list({ tier, limit: 0 }).map((row) => ({
+      ...row,
+      retention: retentionOf(row),
+      score: memoryScore(row),
+    }));
+  }
+
   async function maintain({ day = '', now = Date.now() } = {}) {
     const s = space();
     const decayed = s.applyDecay({ now });
@@ -247,7 +256,7 @@ export function createMemoryService({ store, persona, logger = () => {}, vectorF
   }
 
   return {
-    resolveDirs, search, add, update, remove, supersede, list, stats, blocks, health, maintain,
+    resolveDirs, search, add, update, remove, supersede, list, recallCandidates, stats, blocks, health, maintain,
     consolidationPrompt, applyConsolidation, consolidate,
   };
 }
