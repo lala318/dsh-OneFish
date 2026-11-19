@@ -1,0 +1,38 @@
+{
+  "name": "onefish-component-bili",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "OneFish B站 component: DM / comment inbox inbound bridge plus bili_* MCP tools (watch video, subtitles, comments, DMs).",
+  "main": "./lib/index.js",
+  "exports": {
+    ".": "./lib/index.js"
+  },
+  "files": [
+    "lib",
+    "scripts",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node --test test/bili.test.mjs test/inbound.test.mjs test/http.test.mjs test/comments.test.mjs test/video.test.mjs test/mcp.test.mjs",
+    "setup": "node scripts/setup-dsh.mjs",
+    "settings": "node scripts/settings.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@onefish/component-sdk": "file:../../packages/component-sdk",
+    "zod": "4.6.7"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": [
+        "./cordis.patch.yml"
+      ]
+    }
+  },
+  "license": "MIT"
+}
