@@ -64,7 +64,7 @@ OneFish 的 B站 频道组件（第一版只接三件事：**看视频 / 私信 
 ```
 
 ```powershell
-$env:ONEFISH_COMPONENT_STATE_DIR = 'C:\Users\lala\.dsh\onefish-core\components\bili'
+$env:ONEFISH_COMPONENT_STATE_DIR = "$HOME\.dsh\onefish-core\components\bili"
 $env:ONEFISH_COMPONENT_CONFIG_FILE = "$env:ONEFISH_COMPONENT_STATE_DIR\config.json"
 npm run settings -- show
 npm run settings -- set-json '{"owner":{"mid":"123456"}}'

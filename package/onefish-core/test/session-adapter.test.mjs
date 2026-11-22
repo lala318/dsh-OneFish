@@ -80,13 +80,13 @@ const adapter = createDshSessionAdapter({
   historyMaxPages: 5,
 });
 
-const ws = await adapter.ensureWorkspace({ path: 'C:/Users/lala/.dsh/OneFish', title: 'onefish' });
+const ws = await adapter.ensureWorkspace({ path: 'C:/work/OneFish', title: 'onefish' });
 assert.deepEqual(ws, {
   workspaceId: 'workspace-onefish',
   workspaceTitle: 'onefish',
-  workspacePath: 'C:/Users/lala/.dsh/OneFish',
+  workspacePath: 'C:/work/OneFish',
 });
-assert.deepEqual(calls.workspaceCreate, [{ path: 'C:/Users/lala/.dsh/OneFish', title: 'onefish' }]);
+assert.deepEqual(calls.workspaceCreate, [{ path: 'C:/work/OneFish', title: 'onefish' }]);
 assert.equal(workspace.title, 'onefish');
 
 const created = await adapter.createDaily({

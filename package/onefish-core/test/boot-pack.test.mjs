@@ -26,7 +26,7 @@ try {
 
   const text = core.bootPack.build({
     day: '2026-11-13',
-    workspace: { workspaceTitle: 'onefish', workspacePath: 'C:/Users/lala/.dsh/OneFish' },
+    workspace: { workspaceTitle: 'onefish', workspacePath: 'C:/work/OneFish' },
   });
 
   assert.match(text, /【OneFish 开机包】2026-11-13/);
