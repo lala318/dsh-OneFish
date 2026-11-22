@@ -41,7 +41,7 @@
 
 ### 4. 向量索引
 
-- 索引路径：`memory-v2/space/vectors/index.jsonl`；
+- 索引路径：`memory/vectors/index.jsonl`；
 - 默认 embedding：`bge-small-zh-v1.5` ONNX（512 维，模型/runtime 可配置）；
 - 模型不可用时回退本地 hash 向量（256 维），索引 meta 记录 model/dim；
 - `textHash` 增量复用，模型变化自动重建；

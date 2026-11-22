@@ -42,16 +42,16 @@ npm run setup
 
 ## 数据
 
-- 核心数据根：`~/.dsh/onefish-core`（独立目录，**不读取旧 SurfCore 数据**）。
+- 核心数据根：`~/.dsh/onefish`（独立目录，**不读取旧 SurfCore 数据**）。可重装的向量运行时在 `~/.dsh/cache/onefish`。
 - 需要指定别处：设置 `ONEFISH_CORE_HOME`。
-- 人格：默认内置中性人格；在设置页保存后会写到 `~/.dsh/onefish-core/core/persona.md`；不自动继承旧 `roles/` 或旧角色包。
-- 记忆：`~/.dsh/onefish-core/memory-v2/space/entries.jsonl`（首次写入时创建）。
-- 记忆向量索引：`~/.dsh/onefish-core/memory-v2/space/vectors/index.jsonl`（默认 bge-small-zh-v1.5 ONNX；模型不可用时自动回退本地 hash）。
+- 人格：默认内置中性人格；在设置页保存后会写到 `~/.dsh/onefish/persona.md`；角色人格在 `~/.dsh/onefish/characters/<角色>/persona.md`。不自动继承旧 `roles/` 或旧角色包。
+- 记忆：`~/.dsh/onefish/characters/<角色>/memory/entries.jsonl`（首次写入时创建）。
+- 记忆向量索引：`~/.dsh/onefish/characters/<角色>/memory/vectors/index.jsonl`（默认 bge-small-zh-v1.5 ONNX；模型不可用时自动回退本地 hash）。
 - 记忆整理：模型输出 JSON ops，`memory-consolidate` 校验后落库；人工只保留删除/手动添加。
-- 空闲钟状态：`~/.dsh/onefish-core/core/idle-clock.json`。
-- 日会话索引：`~/.dsh/onefish-core/core/session-index.json`（只存 day → sessionId，不存消息）。
-- 全量档案：`~/.dsh/onefish-core/archive/days/YYYY-MM-DD.jsonl`。
-- 日摘要：`~/.dsh/onefish-core/archive/digests/YYYY-MM-DD.md`。
+- 空闲钟状态：`~/.dsh/onefish/state/idle-clock.json`。
+- 日会话索引：`~/.dsh/onefish/state/session-index.json`（只存 day → sessionId，不存消息）。
+- 全量档案：`~/.dsh/onefish/archive/days/YYYY-MM-DD.jsonl`。
+- 日摘要：`~/.dsh/onefish/archive/digests/YYYY-MM-DD.md`。
 
 ## 时间戳
 
@@ -90,7 +90,7 @@ MCP：`idle_status`、`idle_preview`。
 ## 记忆维护
 
 - **遗忘曲线**：按重要度、使用次数、层级计算 stability / retention；low-retention active 记忆在主动注入时被跳过。
-- **语义向量**：默认加载 `~/.dsh/onefish-core/runtime/onnx-embed/model` 的 bge-small-zh-v1.5；`memory_search` 做 lexical + cosine 混合检索。模型/onnxruntime 不可用时自动回退本地 hash，并写入索引 model 标记。
+- **语义向量**：默认加载 `~/.dsh/cache/onefish/runtime/onnx-embed/model` 的 bge-small-zh-v1.5；`memory_search` 做 lexical + cosine 混合检索。模型/onnxruntime 不可用时自动回退本地 hash，并写入索引 model 标记。
 - **夜间模型整理**：日终 consolidation 后，Core 通过独立 DSH 会话让模型输出 `{"ops":[...]}`；`memory-consolidate` 校验后自动落库，人工只保留删除/手动添加，不逐条审计。
 - **矛盾/过期**：`supersede` 用新事实替代旧事实；旧条目保留在 `meta`/`superseded`，不再进入默认检索和注入。
 - 手动/调试入口：`memory_maintain`、`memory_consolidation_prompt`、`memory_consolidate_apply`、`memory_supersede` MCP。
@@ -100,8 +100,8 @@ embedding 配置：
 ```json
 {
   "embedding": {
-    "runtimeDir": "C:/Users/you/.dsh/onefish-core/runtime/onnx-embed",
-    "modelDir": "C:/Users/you/.dsh/onefish-core/runtime/onnx-embed/model"
+    "runtimeDir": "C:/Users/you/.dsh/cache/onefish/runtime/onnx-embed",
+    "modelDir": "C:/Users/you/.dsh/cache/onefish/runtime/onnx-embed/model"
   }
 }
 ```

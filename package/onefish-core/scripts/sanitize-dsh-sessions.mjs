@@ -18,7 +18,7 @@ const apply = args.includes('--apply');
 const includeActive = args.includes('--include-active');
 const dshHome = path.resolve(process.env.DSH_HOME || path.join(os.homedir(), '.dsh'));
 const sessionsRoot = path.join(dshHome, 'sessions');
-const indexPath = path.join(dshHome, 'onefish-core', 'core', 'session-index.json');
+const indexPath = path.join(dshHome, 'onefish', 'state', 'session-index.json');
 
 function readJson(file, fallback = null) {
   try {

@@ -19,9 +19,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 
-export const DEFAULT_RUNTIME_DIR = path.join(
-  process.env.USERPROFILE || os.homedir(), '.dsh', 'onefish', 'runtime', 'onnx-embed',
-);
+const DSH_HOME = process.env.DSH_HOME || path.join(process.env.USERPROFILE || os.homedir(), '.dsh');
+
+export const DEFAULT_RUNTIME_DIR = path.join(DSH_HOME, 'cache', 'onefish', 'runtime', 'onnx-embed');
 export const DEFAULT_MODEL_DIR = path.join(DEFAULT_RUNTIME_DIR, 'model');
 export const DEFAULT_DIM = 512;
 const MAX_LEN = 512;

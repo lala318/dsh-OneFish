@@ -122,7 +122,7 @@ export function createCore({
 
   function log(line) {
     try {
-      fs.mkdirSync(paths.coreDir, { recursive: true });
+      fs.mkdirSync(paths.logsDir, { recursive: true });
       fs.appendFileSync(paths.pluginLog, `[${new Date().toISOString()}] ${line}\n`, 'utf8');
     } catch {}
     try { logger(line); } catch {}

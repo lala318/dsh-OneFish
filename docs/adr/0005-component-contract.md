@@ -137,8 +137,8 @@ Outbound：
 
 ### 6. 状态和配置
 
-- 组件状态：`~/.dsh/onefish-core/components/<id>/`
-- 组件配置：`~/.dsh/onefish-core/core/config.json` 的 `components.<id>`
+- 组件状态：`~/.dsh/onefish/components/<id>/`
+- 组件配置：组件自己的 `<stateDir>/config.json`（Core 不代管）
 - 组件不能读写 core 的 persona / memory / session-index。
 
 ### 7. 版本和隔离

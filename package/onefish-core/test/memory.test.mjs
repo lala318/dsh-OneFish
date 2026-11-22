@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createCore } from '../lib/core/index.js';
+import { createMemoryStore } from '../lib/core/adapters/fs/memory-store.js';
 
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'onefish-memory-test-'));
 try {
@@ -30,10 +31,9 @@ try {
   const maintained = await core.memory.maintain({ day: '2026-11-15' });
   assert.equal(maintained.ok, true);
   assert.ok(maintained.indexed.total >= 3);
-  assert.ok(fs.existsSync(core.paths.home + '/memory-v2/space/vectors/index.jsonl'));
-
   const index = path.join(core.memory.resolveDirs().spaceDir, 'vectors', 'index.jsonl');
   assert.ok(fs.existsSync(index));
+  assert.match(core.memory.resolveDirs().spaceDir.replaceAll('\\', '/'), /\/memory$/);
   assert.ok(core.memory.list().every((row) => typeof row.retention === 'number'));
 
   // P1：模型输出的 ops 经过校验后落库。
@@ -77,6 +77,18 @@ try {
   assert.ok(decayed.decayed.changed >= 1);
   assert.doesNotMatch(core.memory.blocks().active, /很久以前的低优先级片段/);
   assert.ok(old.id);
+
+  // 布局兼容：新布局 <角色>/memory 优先；只有旧目录时仍能找到。
+  {
+    const base = path.join(temp, 'characters', 'layout-check');
+    fs.mkdirSync(path.join(base, 'memory-v2', 'space'), { recursive: true });
+    fs.writeFileSync(path.join(base, 'memory-v2', 'space', 'entries.jsonl'), '', 'utf8');
+    const store = createMemoryStore({ paths: core.paths });
+    assert.equal(store.describe('layout-check').spaceDir, path.join(base, 'memory-v2', 'space'));
+    fs.mkdirSync(path.join(base, 'memory'), { recursive: true });
+    fs.writeFileSync(path.join(base, 'memory', 'entries.jsonl'), '', 'utf8');
+    assert.equal(store.describe('layout-check').spaceDir, path.join(base, 'memory'));
+  }
 
   console.log('✅ 记忆升级测试通过');
 } finally {

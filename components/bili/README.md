@@ -50,7 +50,7 @@ OneFish 的 B站 频道组件（第一版只接三件事：**看视频 / 私信 
 
 ## 4. 配置
 
-组件自管配置：`<stateDir>/config.json`（默认 `~/.dsh/onefish-core/components/bili/config.json`）。
+组件自管配置：`<stateDir>/config.json`（默认 `~/.dsh/onefish/components/bili/config.json`）。
 
 ```jsonc
 {
@@ -64,7 +64,7 @@ OneFish 的 B站 频道组件（第一版只接三件事：**看视频 / 私信 
 ```
 
 ```powershell
-$env:ONEFISH_COMPONENT_STATE_DIR = "$HOME\.dsh\onefish-core\components\bili"
+$env:ONEFISH_COMPONENT_STATE_DIR = "$HOME\.dsh\onefish\components\bili"
 $env:ONEFISH_COMPONENT_CONFIG_FILE = "$env:ONEFISH_COMPONENT_STATE_DIR\config.json"
 npm run settings -- show
 npm run settings -- set-json '{"owner":{"mid":"123456"}}'
@@ -74,7 +74,7 @@ npm run settings -- set-json '{"owner":{"mid":"123456"}}'
 
 ## 5. 状态
 
-目录：`~/.dsh/onefish-core/components/bili/`
+目录：`~/.dsh/onefish/components/bili/`
 
 | 文件 | 内容 |
 | --- | --- |

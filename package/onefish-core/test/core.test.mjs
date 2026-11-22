@@ -44,7 +44,7 @@ try {
     encoding: 'utf8',
     env: { ...process.env, DSH_HOME: childHome, ONEFISH_CORE_HOME: '' },
   }).trim();
-  assert.equal(defaultHome, path.join(childHome, 'onefish-core'));
+  assert.equal(defaultHome, path.join(childHome, 'onefish'));
   assert.ok(!defaultHome.toLowerCase().includes('surfcore'), '默认数据根不能落到旧 SurfCore 目录');
 
   // 人格

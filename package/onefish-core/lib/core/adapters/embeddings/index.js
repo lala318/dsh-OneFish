@@ -16,6 +16,8 @@ function firstRuntime(runtimeDir = '') {
   const explicit = String(runtimeDir || process.env.ONEFISH_EMBED_RUNTIME || '').trim();
   const candidates = [
     explicit,
+    path.join(DSH_HOME, 'cache', 'onefish', 'runtime', 'onnx-embed'),
+    // 旧位置，只作兼容：2026-11-22 之前 runtime 在数据根里
     path.join(DSH_HOME, 'onefish-core', 'runtime', 'onnx-embed'),
     path.join(DSH_HOME, 'surfcore', 'runtime', 'onnx-embed'),
   ].filter(Boolean);
@@ -24,7 +26,7 @@ function firstRuntime(runtimeDir = '') {
       if (fs.existsSync(path.join(dir, 'model', 'model.onnx'))) return dir;
     } catch {}
   }
-  return explicit || path.join(DSH_HOME, 'onefish', 'runtime', 'onnx-embed');
+  return explicit || path.join(DSH_HOME, 'cache', 'onefish', 'runtime', 'onnx-embed');
 }
 
 export function createEmbeddingProvider({ runtimeDir = '', modelDir = '', logger = () => {} } = {}) {

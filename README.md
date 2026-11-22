@@ -1,6 +1,6 @@
 # OneFish
 
-OneFish 独立项目：和重构前的 SurfCore 仓库分开，只保留最小核心。
+dsh-OneFish 插件：由 SurfCore 修改重构而来，目前只还原最小核心。插件功能还不够完善
 
 ```text
 OneFish/
@@ -50,13 +50,14 @@ npm run setup
 
 ## 数据
 
-核心数据独立在 `~/.dsh/onefish-core`，不读取旧 `~/.dsh/surfcore` 的人格/记忆。
+核心数据独立在 `~/.dsh/onefish`（不读取旧 `~/.dsh/surfcore` 的人格/记忆）；可重装的向量运行时单独放在 `~/.dsh/cache/onefish`，删了能重建。
 
-- 人格：`~/.dsh/onefish-core/core/persona.md`
-- 记忆：`~/.dsh/onefish-core/memory-v2/space/entries.jsonl`
-- 日会话索引：`~/.dsh/onefish-core/core/session-index.json`（只存 day → sessionId）
-- 全量档案：`~/.dsh/onefish-core/archive/days/*.jsonl`
-- 日摘要：`~/.dsh/onefish-core/archive/digests/*.md`
+- 人格：`~/.dsh/onefish/characters/<角色>/persona.md`
+- 记忆：`~/.dsh/onefish/characters/<角色>/memory/entries.jsonl`
+- 日会话索引：`~/.dsh/onefish/state/session-index.json`（只存 day → sessionId）
+- 全量档案：`~/.dsh/onefish/archive/days/*.jsonl`
+- 日摘要：`~/.dsh/onefish/archive/digests/*.md`
+- 组件状态与凭据：`~/.dsh/onefish/components/<组件>/`
 
 ## 会话生命周期
 
