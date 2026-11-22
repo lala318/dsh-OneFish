@@ -5,3 +5,13 @@ state/
 # 组件凭据：永远不进仓库（B站 cookie 这套）
 components/*/credentials.json
 components/*/owner-credentials.json
+
+# 不进公开库的部分
+# QQ 接线：2026-11-15 已弃用，SnowLuma 被官方封堵
+/components/qq/
+# 本机运维脚本（重启 DSH、杀进程），带绝对路径
+/scripts/
+# 内部审查：含本机路径与事故细节
+/docs/reviews/
+# 一次性备份文件
+*.bak-*

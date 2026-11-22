@@ -24,8 +24,8 @@ OneFish/
 ├─ packages/
 │  └─ component-sdk/       # 组件契约 v1
 ├─ components/
-│  ├─ echo/                # 契约假组件
-│  └─ qq/                  # QQ / SnowLuma 组件 + qq_* MCP
+│  ├─ bili/                # B站 组件 + bili_* MCP
+│  └─ echo/                # 契约假组件
 ```
 
 ## 架构决策
@@ -81,4 +81,4 @@ cd $env:USERPROFILE\.dsh\OneFish\package\onefish-core
 npm test
 ```
 
-当前包含 Core MVP：人格 / 记忆 / 日会话，以及可选的 QQ 组件（SnowLuma）。组件配置由组件自己的安装/配置流程管理；Core 不内建组件设置页。
+当前包含 Core MVP：人格 / 记忆 / 日会话，以及可选的 B站 组件。组件配置由组件自己的安装/配置流程管理；Core 不内建组件设置页。
