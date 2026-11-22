@@ -3,7 +3,7 @@
  *
  * 目的：给记忆检索提供语义向量，替代「关键词扫描 + 时间排序」。
  * 设计约束：
- *   · 零外部 API、断网可用（模型与 onnxruntime 都在 ~/.dsh/onefish/runtime 下）；
+ *   · 零外部 API、断网可用（模型与 onnxruntime 都在 ~/.dsh/cache/onefish/runtime 下）；
  *   · 加载失败不影响主流程：调用方拿不到 ready 就回退关键词检索；
  *   · 不把 onnxruntime 装进仓库依赖，而是用独立目录 + createRequire 解析，
  *     避免污染 OneFish 的 package.json / pnpm-lock。
@@ -127,7 +127,7 @@ export function cosine(a, b) {
 /**
  * 创建 embedding 服务。失败时返回 { ready:false, error }，不抛。
  * @param {object} opts
- * @param {string} [opts.runtimeDir] onnxruntime-node 所在目录（默认 ~/.dsh/onefish/runtime/onnx-embed）
+ * @param {string} [opts.runtimeDir] onnxruntime-node 所在目录（默认 ~/.dsh/cache/onefish/runtime/onnx-embed）
  * @param {string} [opts.modelDir]   模型目录
  * @param {(msg:string)=>void} [opts.log]
  */

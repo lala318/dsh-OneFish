@@ -42,16 +42,16 @@ npm run setup
 
 ## 数据
 
-- 核心数据根：`~/.dsh/onefish`（独立目录，**不读取旧 SurfCore 数据**）。可重装的向量运行时在 `~/.dsh/cache/onefish`。
+- 核心数据根：`~/.dsh/onefish-data`（独立目录，**不读取旧 SurfCore 数据**）。可重装的向量运行时在 `~/.dsh/cache/onefish`。
 - 需要指定别处：设置 `ONEFISH_CORE_HOME`。
-- 人格：默认内置中性人格；在设置页保存后会写到 `~/.dsh/onefish/persona.md`；角色人格在 `~/.dsh/onefish/characters/<角色>/persona.md`。不自动继承旧 `roles/` 或旧角色包。
-- 记忆：`~/.dsh/onefish/characters/<角色>/memory/entries.jsonl`（首次写入时创建）。
-- 记忆向量索引：`~/.dsh/onefish/characters/<角色>/memory/vectors/index.jsonl`（默认 bge-small-zh-v1.5 ONNX；模型不可用时自动回退本地 hash）。
+- 人格：默认内置中性人格；在设置页保存后会写到 `~/.dsh/onefish-data/persona.md`；角色人格在 `~/.dsh/onefish-data/characters/<角色>/persona.md`。不自动继承旧 `roles/` 或旧角色包。
+- 记忆：`~/.dsh/onefish-data/characters/<角色>/memory/entries.jsonl`（首次写入时创建）。
+- 记忆向量索引：`~/.dsh/onefish-data/characters/<角色>/memory/vectors/index.jsonl`（默认 bge-small-zh-v1.5 ONNX；模型不可用时自动回退本地 hash）。
 - 记忆整理：模型输出 JSON ops，`memory-consolidate` 校验后落库；人工只保留删除/手动添加。
-- 空闲钟状态：`~/.dsh/onefish/state/idle-clock.json`。
-- 日会话索引：`~/.dsh/onefish/state/session-index.json`（只存 day → sessionId，不存消息）。
-- 全量档案：`~/.dsh/onefish/archive/days/YYYY-MM-DD.jsonl`。
-- 日摘要：`~/.dsh/onefish/archive/digests/YYYY-MM-DD.md`。
+- 空闲钟状态：`~/.dsh/onefish-data/state/idle-clock.json`。
+- 日会话索引：`~/.dsh/onefish-data/state/session-index.json`（只存 day → sessionId，不存消息）。
+- 全量档案：`~/.dsh/onefish-data/archive/days/YYYY-MM-DD.jsonl`。
+- 日摘要：`~/.dsh/onefish-data/archive/digests/YYYY-MM-DD.md`。
 
 ## 时间戳
 

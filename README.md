@@ -50,14 +50,14 @@ npm run setup
 
 ## 数据
 
-核心数据独立在 `~/.dsh/onefish`（不读取旧 `~/.dsh/surfcore` 的人格/记忆）；可重装的向量运行时单独放在 `~/.dsh/cache/onefish`，删了能重建。
+核心数据独立在 `~/.dsh/onefish-data`（不读取旧 `~/.dsh/surfcore` 的人格/记忆）；可重装的向量运行时单独放在 `~/.dsh/cache/onefish`，删了能重建。
 
-- 人格：`~/.dsh/onefish/characters/<角色>/persona.md`
-- 记忆：`~/.dsh/onefish/characters/<角色>/memory/entries.jsonl`
-- 日会话索引：`~/.dsh/onefish/state/session-index.json`（只存 day → sessionId）
-- 全量档案：`~/.dsh/onefish/archive/days/*.jsonl`
-- 日摘要：`~/.dsh/onefish/archive/digests/*.md`
-- 组件状态与凭据：`~/.dsh/onefish/components/<组件>/`
+- 人格：`~/.dsh/onefish-data/characters/<角色>/persona.md`
+- 记忆：`~/.dsh/onefish-data/characters/<角色>/memory/entries.jsonl`
+- 日会话索引：`~/.dsh/onefish-data/state/session-index.json`（只存 day → sessionId）
+- 全量档案：`~/.dsh/onefish-data/archive/days/*.jsonl`
+- 日摘要：`~/.dsh/onefish-data/archive/digests/*.md`
+- 组件状态与凭据：`~/.dsh/onefish-data/components/<组件>/`
 
 ## 会话生命周期
 

@@ -3,7 +3,7 @@
  *
  * 原则：
  *   - 只在这里拼路径；
- *   - **数据根** `~/.dsh/onefish` 只放需要保留的东西（角色/人格、记忆、档案、配置、状态、日志、组件凭据）；
+ *   - **数据根** `~/.dsh/onefish-data` 只放需要保留的东西（角色/人格、记忆、档案、配置、状态、日志、组件凭据）；
  *   - **缓存根** `~/.dsh/cache/onefish` 放可重装的依赖与模型（onnxruntime + bge），删了能重建；
  *   - 需要指向别处（迁移/测试）时显式设置 ONEFISH_CORE_HOME；
  *   - 不读配置、不碰业务。
@@ -18,8 +18,8 @@ import path from 'node:path';
 export const HOME = process.env.USERPROFILE || os.homedir();
 export const DSH_HOME = process.env.DSH_HOME || path.join(HOME, '.dsh');
 
-/** 数据根目录名（~/.dsh/onefish）。 */
-export const DATA_DIR_NAME = 'onefish';
+/** 数据根目录名（~/.dsh/onefish-data）。 */
+export const DATA_DIR_NAME = 'onefish-data';
 /** 缓存根目录名（~/.dsh/cache/onefish）。 */
 export const CACHE_DIR_NAME = 'onefish';
 
@@ -27,7 +27,7 @@ function exists(p) {
   try { return fs.existsSync(p); } catch { return false; }
 }
 
-/** 核心数据根：显式覆盖 → 环境变量 → 默认 ~/.dsh/onefish。 */
+/** 核心数据根：显式覆盖 → 环境变量 → 默认 ~/.dsh/onefish-data。 */
 export function resolveCoreHome(explicit = '') {
   const candidates = [
     String(explicit || '').trim(),

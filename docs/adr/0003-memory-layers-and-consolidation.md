@@ -26,8 +26,8 @@
 
 | 层 | 位置 | 内容 | 写入方式 |
 | --- | --- | --- | --- |
-| 全量档案 | `~/.dsh/onefish/archive/` | 当天会话原文/日摘要/冷索引 | append-only |
-| memory-space | `~/.dsh/onefish/characters/<角色>/memory/` | core / active / knowledge 条目 | 提炼写入 |
+| 全量档案 | `~/.dsh/onefish-data/archive/` | 当天会话原文/日摘要/冷索引 | append-only |
+| memory-space | `~/.dsh/onefish-data/characters/<角色>/memory/` | core / active / knowledge 条目 | 提炼写入 |
 
 全量档案是“历史事实来源”；memory-space 是“可召回的记忆索引”。两者不能互相替代。
 

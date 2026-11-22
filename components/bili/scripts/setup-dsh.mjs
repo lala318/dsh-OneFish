@@ -174,7 +174,7 @@ function patchProfileMcp(profileDir) {
   if (!fs.existsSync(mcpEntry)) fatal(`找不到 MCP 入口：${mcpEntry}`);
   const stateDir = path.resolve(
     String(process.env.ONEFISH_COMPONENT_STATE_DIR || process.env.ONEFISH_BILI_STATE_DIR || '').trim()
-      || path.join(DSH_HOME, 'onefish', 'components', 'bili')
+      || path.join(DSH_HOME, 'onefish-data', 'components', 'bili')
   );
   const configFile = path.resolve(
     String(process.env.ONEFISH_COMPONENT_CONFIG_FILE || '').trim()

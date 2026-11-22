@@ -73,7 +73,7 @@ function writeAtomic(file, text) {
 
 const args = process.argv.slice(2);
 const apply = args.includes('--apply');
-const home = path.resolve(argValue(args, '--home') || path.join(process.env.DSH_HOME || path.join(os.homedir(), '.dsh'), 'onefish'));
+const home = path.resolve(argValue(args, '--home') || path.join(process.env.DSH_HOME || path.join(os.homedir(), '.dsh'), 'onefish-data'));
 const daysDir = path.join(home, 'archive', 'days');
 const digestsDir = path.join(home, 'archive', 'digests');
 
