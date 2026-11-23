@@ -79,9 +79,25 @@ export function createEmbeddingProvider({ runtimeDir = '', modelDir = '', logger
     };
   }
 
+  /** 真的去加载一次（自检用）：别把「还没懒加载」误报成「模型不可用」。 */
+  async function probe({ timeoutMs = 8000 } = {}) {
+    let timer = null;
+    const timeout = new Promise((resolve) => {
+      timer = setTimeout(() => resolve(null), Math.max(500, Number(timeoutMs) || 8000));
+      if (typeof timer.unref === 'function') timer.unref();
+    });
+    try {
+      await Promise.race([ensure().catch(() => null), timeout]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+    return status();
+  }
+
   return {
     embedOne,
     status,
+    probe,
     get ready() { return service?.ready === true; },
     get modelName() { return service?.modelName || (fallback ? 'local-hash-256' : 'unloaded'); },
     get dim() { return service?.dim || HASH_DIM; },

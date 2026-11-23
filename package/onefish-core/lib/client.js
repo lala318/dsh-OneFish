@@ -151,11 +151,17 @@ window.__ModuleLoader__.load({
       }
 
       const loadCore = useCallback(async () => {
-        const [o, p, cs] = await Promise.all([api("/overview"), api("/persona"), api("/characters")]);
+        const [o, p] = await Promise.all([api("/overview"), api("/persona")]);
         setOverview(o);
         setPersona(p);
-        setCharacters({ current: cs.current || "", items: cs.items || [] });
         setPersonaDraft((prev) => (prev && prev !== p.text ? prev : p.text || ""));
+        try {
+          const cs = await api("/characters");
+          setCharacters({ current: cs.current || "", items: cs.items || [] });
+        } catch {
+          // 老版本宿主没有 /characters：页签照常能用，只是没有角色切换。
+          setCharacters({ current: "", items: [] });
+        }
       }, []);
 
       const loadMemory = useCallback(async (query, tier) => {
@@ -188,10 +194,17 @@ window.__ModuleLoader__.load({
 
       const load = useCallback(async () => {
         clearFlash();
-        try {
-          await Promise.all([loadCore(), loadMemory("", ""), loadConfig(), loadIdle(), loadSessions()]);
-        } catch (e) {
-          setError(String(e?.message || e));
+        const jobs = [
+          ["概览", loadCore()],
+          ["记忆", loadMemory("", "")],
+          ["配置", loadConfig()],
+          ["空闲钟", loadIdle()],
+          ["会话", loadSessions()],
+        ];
+        const results = await Promise.allSettled(jobs.map(([, job]) => job));
+        const failed = results.map((item, index) => (item.status === "rejected" ? jobs[index][0] : "")).filter(Boolean);
+        if (failed.length) {
+          setError(`这些没加载成功：${failed.join("、")}。多半是插件和宿主版本对不上，重启 DSH 再试；还不行就看「自检」。`);
         }
       }, [loadCore, loadMemory, loadConfig, loadIdle, loadSessions]);
 

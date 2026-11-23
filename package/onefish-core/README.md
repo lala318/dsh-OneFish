@@ -40,6 +40,27 @@ npm run setup
 > 这个目录是**自包含**的：核心源码在 `lib/core/`，MCP 依赖装在本包 `node_modules/`，
 > 不依赖重构前的 `surfcore-repo`。旧仓库只保留作历史/回退。
 
+## 装完跑不通：先体检
+
+```powershell
+npm run doctor          # 只读检查，不动数据
+npm run doctor -- --init   # 顺手补人格卡和 config.json
+```
+
+查的是：Node 版本、数据目录可写、配置文件、人格卡、记忆条数、**向量模型（真的去加载一次，不是看懒加载状态）**、档案天数，以及新装最容易漏的——插件有没有注册进 profile（`package.json` 的 dependency/bundles、`node_modules` 链接、`cordis.patch.yml` 里的 `mcp-onefish-core`）。每项给 `✔ / ! / ✘` 和一句下一步；有 `✘` 时退出码为 1。
+
+设置页「自检」页签查的是同一批东西（不含 profile 注册），适合已经打开 DSH 的时候看。
+
+常见对应关系：
+
+| 现象 | 多半是 | 怎么办 |
+| --- | --- | --- |
+| 设置里根本没出现 OneFish | 插件没注册进 profile | `npm run doctor` 看 profile / link / mcp 三项，跑 `npm run setup`，然后**完全退出 DSH** 再开 |
+| 页签空白或报「没加载成功」 | 客户端 bundle 还是旧的 | 重启 DSH（刷新页面不够） |
+| 会话页一直「还没有日会话」 | 没拿到 DSH sessionController | 确认插件在 DSH 里加载；`npm run doctor` 里看宿主 |
+| 召回不命中 | 向量模型没装，退化成词面匹配 | 能跑，但弱；要装模型就配 `embedding.runtimeDir/modelDir` |
+| 保存配置后行为没变 | 只有 `idleClock` 立即生效 | 其余字段重启插件 |
+
 ## 新装一台，怎么自己跑起来
 
 设置页「OneFish」→「自检」→ **一键初始化**（或 `POST /dsh-onefish-core/api/bootstrap`）。它会：

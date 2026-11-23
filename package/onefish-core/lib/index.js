@@ -296,10 +296,14 @@ export function apply(ctx) {
     let embeddingStatus = 'skipped';
     let embeddingDetail = '向量模型未就绪，召回先用词面匹配';
     try {
-      const status = core.embedding.status();
+      const status = typeof core.embedding.probe === 'function'
+        ? await core.embedding.probe({ timeoutMs: 6000 })
+        : core.embedding.status();
       if (status?.ready) {
         embeddingStatus = 'done';
-        embeddingDetail = `已就绪（${status.backend || 'onnx'}）`;
+        embeddingDetail = `已就绪（${status.backend || status.model || 'onnx'}）`;
+      } else if (status?.error) {
+        embeddingDetail = `未就绪：${status.error}`;
       }
     } catch (error) {
       embeddingDetail = String(error?.message ?? error);
@@ -324,7 +328,7 @@ export function apply(ctx) {
   }
 
   // ── 自检：给「别人装一台」用，能自己看出哪儿不对 ────────────────
-  function diagnostics() {
+  async function diagnostics() {
     const checks = [];
     const add = (id, title, status, detail, hint = '') => checks.push({ id, title, status, detail, hint });
 
@@ -360,9 +364,15 @@ export function apply(ctx) {
       memory.total > 0 ? '' : '记几条事实，召回才有东西可挑');
 
     let embedding = { ready: false, backend: 'none' };
-    try { embedding = core.embedding.status(); } catch (error) { embedding = { ready: false, backend: 'error', error: String(error?.message ?? error) }; }
+    try {
+      embedding = typeof core.embedding.probe === 'function'
+        ? await core.embedding.probe({ timeoutMs: 6000 })
+        : core.embedding.status();
+    } catch (error) {
+      embedding = { ready: false, backend: 'error', error: String(error?.message ?? error) };
+    }
     add('embedding', '向量检索', embedding?.ready ? 'pass' : 'warn',
-      embedding?.ready ? `已就绪（${embedding.backend || 'onnx'}）` : '未就绪，召回退化为词面匹配',
+      embedding?.ready ? `已就绪（${embedding.model || embedding.backend || 'onnx'}）` : (embedding?.error ? `未就绪：${embedding.error}` : '未就绪，召回退化为词面匹配'),
       embedding?.ready ? '' : '装 onnxruntime + bge 模型，或在「配置」里指定 runtimeDir / modelDir');
 
     add('sessionAdapter', 'DSH 会话适配器', sessionAdapter ? 'pass' : 'fail',
@@ -520,7 +530,7 @@ export function apply(ctx) {
       }
     }
     if (pathname === `${API_PREFIX}/diagnostics` && req.method === 'GET') {
-      json(res, 200, diagnostics());
+      json(res, 200, await diagnostics());
       return;
     }
     if (pathname === `${API_PREFIX}/bootstrap` && req.method === 'POST') {
