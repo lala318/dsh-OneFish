@@ -3,7 +3,7 @@
 OneFish 的 B站 频道组件（第一版只接三件事：**看视频 / 私信 / 评论**）。
 
 - 入站：轮询私信会话 + 评论收件箱（回复我的 / @我的），有新东西才送进 OneFish Core 日会话；
-- 出站：本组件自己的 `bili_*` MCP 工具（发私信、回评论、看视频抽帧、拉字幕/热评）；
+- 出站：本组件自己的 `bili_*` MCP 工具（发私信、回评论、刷首页/热门、看视频抽帧、拉字幕/热评）；
 - 凭据：默认继续读旧 surfcore 的 `~/.dsh/surfcore/bili/credentials.json`，不复制进仓库、不打印、不进 prompt。
 
 ## 1. 目标字段
@@ -43,6 +43,7 @@ OneFish 的 B站 频道组件（第一版只接三件事：**看视频 / 私信 
 | `bili_comment_thread` | 回读某个评论楼的回复 |
 | `bili_comment_list` | 评论区列表（视频 aid / 动态 oid） |
 | `bili_comment_reply` | 发评论 / 二级回复 |
+| `bili_feed` | 刷：首页推荐（WBI 签名）/ 热门 / 排行榜，非稿件条目跳过 |
 | `bili_video_info` | 视频信息（标题/简介/UP/数据/aid/cid） |
 | `bili_video_subtitles` | 字幕全文（优先中文 / AI 字幕） |
 | `bili_video_comments` | 视频热评 |

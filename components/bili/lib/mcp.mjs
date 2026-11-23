@@ -11,6 +11,7 @@
  *   - bili_comment_thread    回读某个评论楼（拿对方到底说了什么）
  *   - bili_comment_list      评论区 / 动态评论列表
  *   - bili_comment_reply     发评论 / 二级回复
+ *   - bili_feed              刷：首页推荐 / 热门 / 排行榜（只读）
  *   - bili_video_info        视频信息（标题/简介/UP/数据）
  *   - bili_video_subtitles   字幕全文
  *   - bili_video_comments    视频热评
@@ -31,6 +32,7 @@ import { createBiliClient } from './http.js';
 import { createDmApi } from './dm.js';
 import { createCommentApi } from './comments.js';
 import { createVideoApi } from './video.js';
+import { createFeedApi } from './feed.js';
 
 const stateDir = resolveStateDir();
 const configFile = loadConfig({ stateDir }).configFile;
@@ -66,6 +68,7 @@ function apis() {
     dm: createDmApi(client, { config }),
     comments: createCommentApi(client, { config }),
     video: createVideoApi(client, { config }),
+    feed: createFeedApi(client),
   };
 }
 
@@ -360,6 +363,26 @@ server.tool(
         parent: parent ? String(parent) : '0',
       });
       return text({ ok: true, ...result });
+    } catch (error) {
+      return fail(error);
+    }
+  }
+);
+
+server.tool(
+  'bili_feed',
+  '刷B站（只读）：kind=recommend 首页推荐（默认）、popular 热门、ranking 排行榜。返回这批稿件的 BV 号/标题/UP/时长/播放，非稿件条目（直播、广告）已跳过；想深看某条再拿 bvid 调 bili_video_*。',
+  {
+    kind: z.enum(['recommend', 'popular', 'ranking']).optional().describe('哪种流，默认 recommend'),
+    ps: z.number().int().min(1).max(50).optional().describe('条数，默认 20'),
+    pn: z.number().int().min(1).optional().describe('页码，仅 popular 用，默认 1'),
+    freshIdx: z.number().int().min(0).optional().describe('推荐流翻页序号，越大越往下，默认 1'),
+    rid: z.number().int().min(0).optional().describe('排行榜分区 id，仅 ranking 用，0=全站'),
+  },
+  async ({ kind, ps, pn, freshIdx, rid }) => {
+    try {
+      const { feed } = apis();
+      return text(await feed.list({ kind: kind || 'recommend', ps, pn, freshIdx, rid }));
     } catch (error) {
       return fail(error);
     }

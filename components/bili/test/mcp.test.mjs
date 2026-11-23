@@ -63,7 +63,7 @@ function rpcSession() {
   return { child, request, notify };
 }
 
-test('MCP tools/list：12 个 bili_* 工具都在', async () => {
+test('MCP tools/list：13 个 bili_* 工具都在', async () => {
   const session = rpcSession();
   try {
     const init = await session.request(1, 'initialize', {
@@ -83,6 +83,7 @@ test('MCP tools/list：12 个 bili_* 工具都在', async () => {
       'bili_dm_messages',
       'bili_dm_send',
       'bili_dm_sessions',
+      'bili_feed',
       'bili_status',
       'bili_video_comments',
       'bili_video_frames',
