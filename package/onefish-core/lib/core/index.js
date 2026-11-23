@@ -133,3 +133,4 @@ export function createCore({
 
 export { createCorePaths, resolveCoreHome } from './adapters/fs/paths.js';
 export { dayKeyOf, dayStart, dayEnd } from './domain/day.js';
+export { DEFAULT_CONFIG, normalizeConfig } from './domain/config.js';

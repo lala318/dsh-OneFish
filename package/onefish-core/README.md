@@ -40,6 +40,43 @@ npm run setup
 > 这个目录是**自包含**的：核心源码在 `lib/core/`，MCP 依赖装在本包 `node_modules/`，
 > 不依赖重构前的 `surfcore-repo`。旧仓库只保留作历史/回退。
 
+## 新装一台，怎么自己跑起来
+
+设置页「OneFish」→「自检」→ **一键初始化**（或 `POST /dsh-onefish-core/api/bootstrap`）。它会：
+
+1. 补齐数据目录；
+2. 没有人格卡时写一版**空壳**（不会覆盖已有的）；
+3. 没有 `config.json` 时落一份默认配置；
+4. 检查向量模型是否就绪（不会替你下载）；
+5. 建今天的日会话（需要 DSH 的 sessionController；没有就如实报失败并给提示）。
+
+跑完看「自检」页：每一项都有 `正常 / 注意 / 异常` 和一句下一步提示。能自动做的都做了，剩下的必须人来做（写人格、装模型、给权限），不会假装成功。
+
+## 设置页
+
+| 页签 | 能做什么 |
+| --- | --- |
+| 概览 | 数据目录 / 人格 / 会话 / 记忆层级 / 已登记组件；没配好时顶部出现「一键初始化」 |
+| 人格 | 编辑并保存人格卡（下一轮生效），有未保存改动提示 |
+| 记忆 | 按内容/层级搜索、写入、软删除、手动跑一次维护 |
+| 配置 | 基础、开机包与人格上限、整理与时间戳、每轮召回、向量模型；保存后逐项列出被修正的字段 |
+| 空闲钟 | 启用、最小空闲、概率尺度/形状、冷却、检查间隔；预览 prompt、立即触发 |
+| 会话 | 预览开机包、新建今日会话、按日期整理、让会话退役 |
+| 自检 | 环境检查清单 + 一键初始化结果 |
+
+配置写入 `<数据根>/config.json`。**保存后能立即生效的只有 `idleClock`**（它有自己的 configure），其余字段由各服务启动时快照，需要重启插件；保存结果的提示里会分开写明。
+
+接口：
+
+```text
+GET  /dsh-onefish-core/api/config        # 当前配置 + 默认值 + liveKeys
+POST /dsh-onefish-core/api/config        # { config: {...} } 归一化落盘，返回 warnings
+GET  /dsh-onefish-core/api/diagnostics   # 自检清单
+POST /dsh-onefish-core/api/bootstrap     # 一键初始化
+```
+
+写接口都要求本机回环 Host、同源 Origin、`application/json`。
+
 ## 数据
 
 - 核心数据根：`~/.dsh/onefish-data`（独立目录，**不读取旧 SurfCore 数据**）。可重装的向量运行时在 `~/.dsh/cache/onefish`。

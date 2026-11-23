@@ -13,6 +13,7 @@ import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { createCore } from './core/index.js';
+import { DEFAULT_CONFIG, normalizeConfig } from './core/index.js';
 import { createDshSessionAdapter } from './core/adapters/dsh/session-adapter.js';
 import { createDshCompletion } from './core/adapters/dsh/completion.js';
 import { createDshComponentBroker } from './core/adapters/dsh/component-broker.js';
@@ -145,6 +146,260 @@ export function apply(ctx) {
     return next;
   }
 
+  // ── 配置：读 / 归一化写 / 差异回报 ───────────────────────────────
+  /** 改完立即生效的字段；其余要重启插件（各服务启动时快照配置）。 */
+  const CONFIG_LIVE_KEYS = ['idleClock'];
+
+  function isPlainObject(value) {
+    return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+  }
+
+  function deepMerge(base, patch) {
+    const out = { ...(isPlainObject(base) ? base : {}) };
+    for (const [key, value] of Object.entries(patch || {})) {
+      out[key] = isPlainObject(value) && isPlainObject(out[key]) ? { ...out[key], ...value } : value;
+    }
+    return out;
+  }
+
+  function flattenLeaves(value, prefix = '', out = {}) {
+    if (isPlainObject(value)) {
+      for (const [key, child] of Object.entries(value)) flattenLeaves(child, prefix ? `${prefix}.${key}` : key, out);
+      return out;
+    }
+    out[prefix] = Array.isArray(value) ? JSON.stringify(value) : value;
+    return out;
+  }
+
+  /** 把「请求里的值」和「归一化后的值」逐项对比，告诉设置页哪些被夹紧/丢弃了。 */
+  function configWarnings(requested, normalized) {
+    const want = flattenLeaves(requested);
+    const got = flattenLeaves(normalized);
+    const warnings = [];
+    for (const [key, value] of Object.entries(want)) {
+      if (value === undefined || value === null) continue;
+      if (!(key in got)) {
+        warnings.push({ path: key, requested: value, applied: undefined, reason: '未知配置项，已忽略' });
+        continue;
+      }
+      if (String(got[key]) !== String(value)) {
+        warnings.push({ path: key, requested: value, applied: got[key], reason: '已按取值范围修正' });
+      }
+    }
+    return warnings;
+  }
+
+  function writeConfigFile(config) {
+    const file = core.paths.configFile;
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
+    fs.writeFileSync(tmp, `${JSON.stringify(config, null, 2)}\n`, 'utf8');
+    fs.renameSync(tmp, file);
+  }
+
+  function configSnapshot() {
+    return {
+      ok: true,
+      file: core.paths.configFile,
+      config: core.config,
+      defaults: DEFAULT_CONFIG,
+      liveKeys: CONFIG_LIVE_KEYS,
+    };
+  }
+
+  function applyConfigPatch(patch) {
+    if (!isPlainObject(patch)) throw new Error('配置必须是 JSON 对象');
+    const allowed = Object.keys(DEFAULT_CONFIG);
+    const accepted = {};
+    for (const [key, value] of Object.entries(patch)) {
+      if (allowed.includes(key)) accepted[key] = value;
+    }
+    const requested = deepMerge(core.config, patch);
+    const normalized = normalizeConfig(deepMerge(core.config, accepted));
+    writeConfigFile(normalized);
+    Object.assign(core.config, normalized);
+    // 空闲钟有自己的 configure，能立即生效；其余服务是启动时快照，只能等重启。
+    try { core.idle.configure(normalized.idleClock); } catch {}
+    return {
+      ok: true,
+      config: core.config,
+      applied: {
+        live: CONFIG_LIVE_KEYS.filter((key) => key in accepted),
+        restart: Object.keys(accepted).filter((key) => !CONFIG_LIVE_KEYS.includes(key)),
+      },
+      warnings: configWarnings(requested, normalized),
+    };
+  }
+
+  // ── 首次使用：能自动补的都补上，补不了的说清楚 ───────────────────
+  const STARTER_PERSONA = [
+    '# 新角色',
+    '',
+    '## 你是谁',
+    '- 名字：还没定，先把这里改成你自己想要的。',
+    '- 一句话：这张卡是空壳，写满了才算有个人。',
+    '',
+    '## 你怎么说话',
+    '- 短句、直接、不客套；不知道就说不知道。',
+    '',
+    '## 边界',
+    '- 不装懂，不编造查不到的东西。',
+    '',
+  ].join('\n');
+
+  async function bootstrap() {
+    const actions = [];
+    const push = (id, title, status, detail, hint = '') => actions.push({ id, title, status, detail, hint });
+
+    let dirsOk = true;
+    let dirsError = '';
+    for (const dir of [core.paths.home, core.paths.charactersDir, core.paths.stateDir, core.paths.logsDir, core.paths.archiveDir, core.paths.componentsDir]) {
+      try { fs.mkdirSync(dir, { recursive: true }); } catch (error) { dirsOk = false; dirsError = String(error?.message ?? error); }
+    }
+    push('dirs', '数据目录', dirsOk ? 'done' : 'failed', dirsOk ? core.paths.home : dirsError,
+      dirsOk ? '' : '确认这个路径可写，或用 ONEFISH_CORE_HOME 换一个');
+
+    let personaStatus = 'skipped';
+    let personaDetail = '已有人格卡，没有覆盖';
+    try {
+      const health = core.persona.health();
+      const configured = health.hasCharacter || fs.existsSync(core.paths.fallbackPersona);
+      if (!configured) {
+        core.persona.update(STARTER_PERSONA);
+        personaStatus = 'done';
+        personaDetail = '写了一版空壳人格卡，去「人格」页改成你想要的';
+      } else {
+        personaDetail = `${health.name || '未命名'} · ${health.chars} 字`;
+      }
+    } catch (error) {
+      personaStatus = 'failed';
+      personaDetail = String(error?.message ?? error);
+    }
+    push('persona', '人格卡', personaStatus, personaDetail, personaStatus === 'done' ? '这条只是占位，写得越具体越不像客服' : '');
+
+    let configStatus = 'skipped';
+    let configDetail = '配置文件已存在，没有动它';
+    try {
+      if (!fs.existsSync(core.paths.configFile)) {
+        writeConfigFile(normalizeConfig(core.config));
+        configStatus = 'done';
+        configDetail = core.paths.configFile;
+      } else {
+        configDetail = core.paths.configFile;
+      }
+    } catch (error) {
+      configStatus = 'failed';
+      configDetail = String(error?.message ?? error);
+    }
+    push('config', '配置文件', configStatus, configDetail);
+
+    let embeddingStatus = 'skipped';
+    let embeddingDetail = '向量模型未就绪，召回先用词面匹配';
+    try {
+      const status = core.embedding.status();
+      if (status?.ready) {
+        embeddingStatus = 'done';
+        embeddingDetail = `已就绪（${status.backend || 'onnx'}）`;
+      }
+    } catch (error) {
+      embeddingDetail = String(error?.message ?? error);
+    }
+    push('embedding', '向量模型', embeddingStatus, embeddingDetail,
+      embeddingStatus === 'done' ? '' : '这一步需要本地模型文件，不能替你下载；装好后重启或重新自检');
+
+    if (!sessionAdapter) {
+      push('session', '今日会话', 'failed', '没有 sessionController，建不了日会话',
+        '确认插件在 DSH 里正常加载，注入项齐全后重启');
+    } else {
+      try {
+        const result = await core.session.ensureToday();
+        push('session', '今日会话', 'done', result?.created === false ? '今天的日会话已经在了' : '已建立今日日会话');
+      } catch (error) {
+        push('session', '今日会话', 'failed', String(error?.message ?? error), '在 DSH 里随便发一条消息也会自动建');
+      }
+    }
+
+    const done = actions.filter((item) => item.status === 'done').length;
+    return { ok: actions.every((item) => item.status !== 'failed'), actions, done, total: actions.length };
+  }
+
+  // ── 自检：给「别人装一台」用，能自己看出哪儿不对 ────────────────
+  function diagnostics() {
+    const checks = [];
+    const add = (id, title, status, detail, hint = '') => checks.push({ id, title, status, detail, hint });
+
+    add('node', 'Node 运行时', Number(process.versions.node.split('.')[0]) >= 22 ? 'pass' : 'warn',
+      `v${process.versions.node}`, '需要 Node ≥ 22.13');
+
+    let homeWritable = false;
+    let homeError = '';
+    try {
+      const probe = path.join(core.paths.stateDir, `.write-probe-${process.pid}`);
+      fs.writeFileSync(probe, 'ok', 'utf8');
+      fs.rmSync(probe, { force: true });
+      homeWritable = true;
+    } catch (error) {
+      homeError = String(error?.message ?? error);
+    }
+    add('home', '数据目录可写', homeWritable ? 'pass' : 'fail', homeWritable ? core.paths.home : homeError,
+      homeWritable ? '' : '检查目录权限，或用 ONEFISH_CORE_HOME 指到可写位置');
+
+    const configExists = fs.existsSync(core.paths.configFile);
+    add('config', '配置文件', configExists ? 'pass' : 'warn',
+      configExists ? core.paths.configFile : '还没有 config.json（使用默认值）',
+      configExists ? '' : '在「配置」页保存一次就会生成');
+
+    const persona = core.persona.health();
+    const personaConfigured = persona.hasCharacter || fs.existsSync(core.paths.fallbackPersona);
+    add('persona', '人格卡', personaConfigured ? 'pass' : 'warn',
+      personaConfigured ? `${persona.name || '未命名'} · ${persona.chars || 0} 字` : '还是内置的中性人格',
+      personaConfigured ? '' : '点「一键初始化」写一版空壳，或去「人格」页写下它是什么人');
+
+    const memory = core.memory.health();
+    add('memory', '记忆', memory.total > 0 ? 'pass' : 'warn', `共 ${memory.total || 0} 条`,
+      memory.total > 0 ? '' : '记几条事实，召回才有东西可挑');
+
+    let embedding = { ready: false, backend: 'none' };
+    try { embedding = core.embedding.status(); } catch (error) { embedding = { ready: false, backend: 'error', error: String(error?.message ?? error) }; }
+    add('embedding', '向量检索', embedding?.ready ? 'pass' : 'warn',
+      embedding?.ready ? `已就绪（${embedding.backend || 'onnx'}）` : '未就绪，召回退化为词面匹配',
+      embedding?.ready ? '' : '装 onnxruntime + bge 模型，或在「配置」里指定 runtimeDir / modelDir');
+
+    add('sessionAdapter', 'DSH 会话适配器', sessionAdapter ? 'pass' : 'fail',
+      sessionAdapter ? '可用' : '不可用：没有拿到 sessionController',
+      sessionAdapter ? '' : '确认插件在 DSH 里加载，且注入项 webServer / connection / sessionController 齐全');
+
+    const stats = core.session.stats();
+    add('session', '今日会话', stats.active ? 'pass' : 'warn',
+      stats.active ? `${stats.currentDay} · ${stats.active.sessionId}` : '今天还没有日会话',
+      stats.active ? '' : '在 DSH 里发一条消息，或点「新建今日会话」');
+
+    add('archive', '档案', 'pass', `${core.archive.listDays().length} 天`, '');
+
+    const components = core.components.list();
+    add('components', '频道组件', components.length > 0 ? 'pass' : 'warn',
+      components.length > 0 ? `${components.length} 个已登记` : '还没有登记任何组件',
+      components.length > 0 ? '' : '装好组件后重启，它们会出现在「概览」里');
+
+    const failed = checks.filter((item) => item.status === 'fail').length;
+    const warned = checks.filter((item) => item.status === 'warn').length;
+    return {
+      ok: true,
+      version: VERSION,
+      node: process.version,
+      platform: `${process.platform} ${process.arch}`,
+      home: core.paths.home,
+      configFile: core.paths.configFile,
+      checks,
+      summary: { pass: checks.length - failed - warned, warn: warned, fail: failed },
+      embedding,
+      components,
+      memory,
+      persona,
+      session: stats,
+    };
+  }
+
   function isLoopback(req) {
     const host = String(req.headers?.host ?? '').trim().toLowerCase();
     if (!host) return false;
@@ -218,6 +473,7 @@ export function apply(ctx) {
       home: core.paths.home,
       persona: {
         ...core.persona.health(),
+        configured: core.persona.health().hasCharacter || fs.existsSync(core.paths.fallbackPersona),
         preview: String(persona.text || '').split('\n').slice(0, 3).join('\n'),
       },
       memory: core.memory.health(),
@@ -239,6 +495,36 @@ export function apply(ctx) {
     const pathname = url.pathname;
     if (pathname === `${API_PREFIX}/overview` && req.method === 'GET') {
       json(res, 200, overview());
+      return;
+    }
+    if (pathname === `${API_PREFIX}/config`) {
+      if (req.method === 'GET') {
+        json(res, 200, configSnapshot());
+        return;
+      }
+      if (req.method === 'POST') {
+        const body = await readBody(req);
+        let patch = body;
+        if (isPlainObject(body) && 'config' in body) patch = body.config;
+        else if (isPlainObject(body) && 'patch' in body) patch = body.patch;
+        let result;
+        try {
+          result = applyConfigPatch(patch || {});
+        } catch (error) {
+          json(res, 400, { ok: false, error: String(error?.message ?? error) });
+          return;
+        }
+        core.log(`配置已更新：live=${result.applied.live.join(',') || '-'} restart=${result.applied.restart.join(',') || '-'}`);
+        json(res, 200, result);
+        return;
+      }
+    }
+    if (pathname === `${API_PREFIX}/diagnostics` && req.method === 'GET') {
+      json(res, 200, diagnostics());
+      return;
+    }
+    if (pathname === `${API_PREFIX}/bootstrap` && req.method === 'POST') {
+      json(res, 200, await bootstrap());
       return;
     }
     if (pathname === `${API_PREFIX}/persona`) {

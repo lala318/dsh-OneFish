@@ -19,7 +19,7 @@
     "README.md"
   ],
   "scripts": {
-    "test": "node test/core.test.mjs && node test/session.test.mjs && node test/session-adapter.test.mjs && node test/boot-pack.test.mjs && node test/recall.test.mjs && node test/components.test.mjs && node test/component-broker.test.mjs && node test/redaction.test.mjs && node test/idle.test.mjs && node test/memory.test.mjs && node test/memory-consolidate.test.mjs && node test/completion.test.mjs && node test/architecture.test.mjs && node test/mcp.test.mjs",
+    "test": "node test/core.test.mjs && node test/session.test.mjs && node test/session-adapter.test.mjs && node test/boot-pack.test.mjs && node test/recall.test.mjs && node test/components.test.mjs && node test/component-broker.test.mjs && node test/redaction.test.mjs && node test/idle.test.mjs && node test/memory.test.mjs && node test/memory-consolidate.test.mjs && node test/completion.test.mjs && node test/architecture.test.mjs && node test/config-api.test.mjs && node test/client-smoke.test.mjs && node test/mcp.test.mjs",
     "setup": "node scripts/setup-dsh.mjs"
   },
   "dependencies": {
