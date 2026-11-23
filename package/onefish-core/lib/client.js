@@ -185,11 +185,11 @@ window.__ModuleLoader__.load({
       const load = useCallback(async () => {
         clearFlash();
         try {
-          await Promise.all([loadCore(), loadMemory(memoryQuery, memoryTier), loadConfig(), loadIdle(), loadSessions()]);
+          await Promise.all([loadCore(), loadMemory("", ""), loadConfig(), loadIdle(), loadSessions()]);
         } catch (e) {
           setError(String(e?.message || e));
         }
-      }, [loadCore, loadMemory, loadConfig, loadIdle, loadSessions, memoryQuery, memoryTier]);
+      }, [loadCore, loadMemory, loadConfig, loadIdle, loadSessions]);
 
       useEffect(() => { void load(); }, [load]);
 
