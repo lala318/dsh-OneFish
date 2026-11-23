@@ -21,10 +21,15 @@ window.__ModuleLoader__.load({
     const API = "/dsh-onefish-core/api";
 
     async function api(path, options = {}) {
-      const res = await fetch(`${API}${path}`, {
-        headers: { accept: "application/json", ...(options.body ? { "content-type": "application/json" } : {}) },
-        ...options,
-      });
+      const method = String(options.method || "GET").toUpperCase();
+      const hasBody = options.body !== undefined;
+      const headers = { accept: "application/json", ...(options.headers || {}) };
+      if (method !== "GET") headers["content-type"] = headers["content-type"] || "application/json";
+      const init = { ...options, method, headers };
+      // 宿主的写接口一律要求 application/json；没有 body 的写操作也要显式给一个空对象，
+      // 否则会被 415「写操作必须是 application/json」挡下来。
+      if (method !== "GET" && !hasBody) init.body = "{}";
+      const res = await fetch(`${API}${path}`, init);
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
       return data;
@@ -864,6 +869,8 @@ window.__ModuleLoader__.load({
     exports.apply = apply;
     exports.inject = ["slots"];
     exports.OneFishCoreSection = OneFishCoreSection;
+    // 测试钩子：不改页面行为，只是让回归测试能直接验证写请求的头部和 body。
+    exports.__api = api;
     return module.exports;
   },
 });
