@@ -88,6 +88,8 @@ npm run doctor -- --init   # 顺手补人格卡和 config.json
 
 配置写入 `<数据根>/config.json`。**保存后能立即生效的只有 `idleClock`**（它有自己的 configure），其余字段由各服务启动时快照，需要重启插件；保存结果的提示里会分开写明。
 
+> **token / 预算不在 core**：core 不计费、不记账（旧 SurfCore 那套 token 管理没有搬过来）。要按天限额度，那是宿主或组件侧的事，这里不假装有。
+
 接口：
 
 ```text
