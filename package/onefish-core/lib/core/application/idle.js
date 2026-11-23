@@ -109,17 +109,28 @@ export function createIdleClockService({
     const text = buildPrompt({ idle });
     try {
       await prompt({ sessionId: current.sessionId, text, reason: manual ? 'manual' : decision.reason });
-      const next = store.write({
-        ...baseState,
-        day,
-        countToday: Number(baseState.countToday || 0) + 1,
-        lastConsiderAt: now(),
-        nextEligibleAt: computeNextEligibleAt(now(), cfg, random),
-        lastIdleMs: idle,
-      });
-      logger(`空闲钟触发：${current.sessionId}（空闲 ${humanDuration(idle)}）`);
+      // 手动「立即想一次」是调试动作：只发一次、只留个时间戳，
+      // 不吃今天的额度、也不进冷却，不然点一下就把当天真触发给点没了。
+      const next = manual
+        ? store.write({
+          ...baseState,
+          day,
+          lastConsiderAt: now(),
+          lastManualAt: now(),
+          lastIdleMs: idle,
+        })
+        : store.write({
+          ...baseState,
+          day,
+          countToday: Number(baseState.countToday || 0) + 1,
+          lastConsiderAt: now(),
+          nextEligibleAt: computeNextEligibleAt(now(), cfg, random),
+          lastIdleMs: idle,
+        });
+      logger(`空闲钟触发：${current.sessionId}（空闲 ${humanDuration(idle)}${manual ? '，手动' : ''}）`);
       return {
         fired: true,
+        manual,
         reason: manual ? 'manual' : decision.reason,
         idleMs: idle,
         probability: decision.probability,

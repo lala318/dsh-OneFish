@@ -690,7 +690,9 @@ window.__ModuleLoader__.load({
           h("div", { style: C.paste },
             h("button", { style: C.btn, disabled: busy === "idle", onClick: saveIdle }, busy === "idle" ? "保存中…" : "保存空闲钟配置"),
             h("button", { style: C.btn2, disabled: busy === "idle-preview", onClick: previewIdle }, busy === "idle-preview" ? "读取中…" : "预览 prompt"),
-            h("button", { style: C.btn2, disabled: busy === "idle-run", onClick: runIdle }, busy === "idle-run" ? "触发中…" : "立即触发一次")),
+            h("button", { style: C.btn2, disabled: busy === "idle-run", onClick: runIdle }, busy === "idle-run" ? "触发中…" : "立即想一次")),
+          h("div", { style: { ...C.hint, marginTop: "6px" } },
+            "「立即想一次」是调试用的：只发一条 prompt，不吃今天的额度、也不进冷却，连点几次都行。"),
           idlePreview
             ? h("pre", { style: { ...C.card, whiteSpace: "pre-wrap", wordBreak: "break-word", marginTop: "10px", fontSize: "12px", lineHeight: "18px" } }, idlePreview)
             : h("div", { style: { ...C.hint, marginTop: "8px" } }, "点「预览 prompt」看看真触发时会说什么。"));

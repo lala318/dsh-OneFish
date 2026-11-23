@@ -135,6 +135,7 @@ POST /dsh-onefish-core/api/characters/switch  # { id } 只改当前角色
 - 状态持久化到 `core/idle-clock.json`；
 - 默认 `enabled: false`，启用后会向当前日会话发一条主动 prompt；
 - 设置页「空闲钟」可直接配置启用、最小空闲、概率尺度/形状、冷却和检查间隔，保存后立即生效并写入 `core/config.json`；
+- 「立即想一次」是调试动作：只发一条 prompt，**不吃当天额度、不进冷却**（`state.lastManualAt` 只作痕迹），不干扰真触发。
 - 可配 `minIdleMs`、`scaleHours`、`shape`、`cooldownMinMs`、`cooldownMaxMs`。
 
 ```json

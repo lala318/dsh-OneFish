@@ -54,8 +54,19 @@ assert.equal(second.fired, false);
 assert.equal(second.reason, 'cooldown');
 
 now += 2 * 60 * 60 * 1000;
+const beforeManual = { countToday: state.countToday, nextEligibleAt: state.nextEligibleAt };
 const manual = await idle.check({ manual: true });
 assert.equal(manual.fired, true);
+assert.equal(manual.manual, true);
 assert.equal(prompts.length, 2);
+assert.equal(state.countToday, beforeManual.countToday, '手动触发不该吃掉今天的额度');
+assert.equal(state.nextEligibleAt, beforeManual.nextEligibleAt, '手动触发不该进入冷却');
+assert.ok(state.lastManualAt > 0, '应该留一个手动触发的痕迹');
+
+// 冷却期内手动仍然可用：它是调试动作，不受概率/冷却约束
+const manualAgain = await idle.check({ manual: true });
+assert.equal(manualAgain.fired, true);
+assert.equal(prompts.length, 3);
+assert.equal(state.countToday, beforeManual.countToday, '连着点也不该累计额度');
 
 console.log('✅ 空闲钟测试通过');
