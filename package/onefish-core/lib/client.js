@@ -117,6 +117,9 @@ window.__ModuleLoader__.load({
 
       const [persona, setPersona] = useState(null);
       const [personaDraft, setPersonaDraft] = useState("");
+      const [characters, setCharacters] = useState({ current: "", items: [] });
+      const [newCharId, setNewCharId] = useState("");
+      const [newCharName, setNewCharName] = useState("");
 
       const [memories, setMemories] = useState([]);
       const [memoryStats, setMemoryStats] = useState(null);
@@ -148,9 +151,10 @@ window.__ModuleLoader__.load({
       }
 
       const loadCore = useCallback(async () => {
-        const [o, p] = await Promise.all([api("/overview"), api("/persona")]);
+        const [o, p, cs] = await Promise.all([api("/overview"), api("/persona"), api("/characters")]);
         setOverview(o);
         setPersona(p);
+        setCharacters({ current: cs.current || "", items: cs.items || [] });
         setPersonaDraft((prev) => (prev && prev !== p.text ? prev : p.text || ""));
       }, []);
 
@@ -427,6 +431,39 @@ window.__ModuleLoader__.load({
         }
       }
 
+      // ── 角色 ────────────────────────────────────────────────────
+      async function switchCharacter(id) {
+        if (!id || id === characters.current) return;
+        setBusy("character"); clearFlash();
+        try {
+          await api("/characters/switch", { method: "POST", body: JSON.stringify({ id }) });
+          setPersonaDraft("");
+          flash(`已切到角色 ${id}`);
+          await loadCore();
+        } catch (e) {
+          setError(String(e?.message || e));
+        } finally {
+          setBusy("");
+        }
+      }
+
+      async function createCharacter() {
+        const id = newCharId.trim();
+        if (!id) { setError("新角色 id 不能为空（字母/数字/._-）"); return; }
+        setBusy("character-create"); clearFlash();
+        try {
+          await api("/characters", { method: "POST", body: JSON.stringify({ id, name: newCharName.trim() || id }) });
+          setNewCharId("");
+          setNewCharName("");
+          flash(`已新建角色 ${id}，可以切过去开始写人格`);
+          await loadCore();
+        } catch (e) {
+          setError(String(e?.message || e));
+        } finally {
+          setBusy("");
+        }
+      }
+
       // ── 渲染：概览 ──────────────────────────────────────────────
       function renderOverview() {
         if (!overview) return h(Empty, null, "加载中…");
@@ -479,7 +516,28 @@ window.__ModuleLoader__.load({
       function renderPersona() {
         if (!persona) return h(Empty, null, "加载中…");
         const dirty = personaDraft !== (persona.text || "");
+        const items = characters.items || [];
         return h("div", null,
+          h("div", { style: { ...C.card, marginBottom: "10px" } },
+            h("div", { style: { display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" } },
+              h("span", { style: C.label }, "当前角色"),
+              h("select", {
+                style: { ...C.input, width: "220px" },
+                value: characters.current || "",
+                disabled: busy === "character",
+                onChange: (e) => switchCharacter(e.target.value),
+              },
+              items.length === 0
+                ? h("option", { value: "" }, "（还没有角色，用的是内置人格）")
+                : null,
+              items.map((item) => h("option", { key: item.id, value: item.id }, `${item.name || item.id} · ${item.id}`))),
+              h("span", { style: C.label }, `共 ${items.length} 个`)),
+            h("div", { style: { ...C.paste, marginTop: "8px" } },
+              h("input", { style: { ...C.input, width: "170px" }, placeholder: "新角色 id", value: newCharId, onChange: (e) => setNewCharId(e.target.value) }),
+              h("input", { style: { ...C.input, width: "170px" }, placeholder: "显示名（可空）", value: newCharName, onChange: (e) => setNewCharName(e.target.value) }),
+              h("button", { style: C.btn2, disabled: busy === "character-create" || !newCharId.trim(), onClick: createCharacter }, busy === "character-create" ? "创建中…" : "新建角色")),
+            h("div", { style: { ...C.hint, marginTop: "6px" } },
+              "切换角色只改「当前角色」，不动人格正文；记忆按角色分空间，不会串。")),
           h("div", { style: { ...C.label, marginBottom: "6px" } }, `当前人格：${persona.name || "—"} · ${persona.source || "—"}`),
           h("textarea", {
             value: personaDraft,
@@ -658,6 +716,30 @@ window.__ModuleLoader__.load({
                   `${item.archivePath ? "档案已写" : "未整理"}${item.consolidatedAt ? ` · ${new Date(item.consolidatedAt).toLocaleString()}` : ""}`)))));
       }
 
+      // ── 渲染：组件 ──────────────────────────────────────────────
+      function renderComponents() {
+        if (!overview) return h(Empty, null, "加载中…");
+        const components = overview.components || [];
+        const color = { running: "#2fbf71", starting: "#c98a1b", failed: "var(--dsw-alias-state-error-primary)", stopped: "var(--dsw-alias-label-tertiary)" };
+        return h("div", null,
+          h("div", { style: { ...C.hint, marginBottom: "10px" } },
+            "组件是可选件：装了什么、跑没跑起来，这里看得见。启停归 DSH 插件加载流程，这个面板只读。"),
+          components.length === 0
+            ? h(Empty, null, "还没有组件登记。装好组件并在 DSH 里重启后，它们会出现在这里。")
+            : h("div", { style: { display: "flex", flexDirection: "column", gap: "8px" } },
+              components.map((item) => h("div", { key: item.id, style: { ...C.card, padding: "10px 12px" } },
+                h("div", { style: { display: "flex", gap: "8px", alignItems: "baseline", flexWrap: "wrap" } },
+                  h("span", { style: { fontSize: "13px", fontWeight: 600 } }, item.name || item.id),
+                  h("span", { style: { ...C.label, fontSize: "11px" } }, `${item.id}${item.version ? ` · v${item.version}` : ""}`),
+                  h("span", { style: { flex: 1 } }),
+                  h("span", { style: { color: color[item.status] || "inherit", fontSize: "12px", fontWeight: 600 } }, item.status || "unknown")),
+                item.error ? h("div", { style: { ...C.err, marginTop: "4px", wordBreak: "break-all" } }, `启动失败：${item.error}`) : null,
+                Array.isArray(item.capabilities) && item.capabilities.length > 0
+                  ? h("div", { style: { display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "6px" } },
+                    item.capabilities.map((cap, index) => h("span", { key: `${item.id}:${cap}:${index}`, style: { ...C.label, border: "1px solid var(--dsw-alias-border-l2)", borderRadius: "999px", padding: "1px 8px", fontSize: "10.5px" } }, String(cap))))
+                  : h("div", { style: { ...C.hint, marginTop: "4px" } }, "没有声明能力")))));
+      }
+
       // ── 渲染：自检 ──────────────────────────────────────────────
       function renderDiagnostics() {
         if (!diagnostics) return h(Empty, null, "还没跑自检。");
@@ -710,6 +792,7 @@ window.__ModuleLoader__.load({
         ["config", "配置"],
         ["idle", "空闲钟"],
         ["session", "会话"],
+        ["components", "组件"],
         ["diag", "自检"],
       ];
 
@@ -745,7 +828,8 @@ window.__ModuleLoader__.load({
                 : tab === "config" ? renderConfig()
                   : tab === "idle" ? renderIdle()
                     : tab === "session" ? renderSession()
-                      : renderDiagnostics()));
+                      : tab === "components" ? renderComponents()
+                        : renderDiagnostics()));
     }
 
     const NAMES = { nav: "OneFish" };

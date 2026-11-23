@@ -57,11 +57,12 @@ npm run setup
 | 页签 | 能做什么 |
 | --- | --- |
 | 概览 | 数据目录 / 人格 / 会话 / 记忆层级 / 已登记组件；没配好时顶部出现「一键初始化」 |
-| 人格 | 编辑并保存人格卡（下一轮生效），有未保存改动提示 |
+| 人格 | 切换角色、新建角色；编辑并保存人格卡（下一轮生效），有未保存改动提示 |
 | 记忆 | 按内容/层级搜索、写入、软删除、手动跑一次维护 |
 | 配置 | 基础、开机包与人格上限、整理与时间戳、每轮召回、向量模型；保存后逐项列出被修正的字段 |
 | 空闲钟 | 启用、最小空闲、概率尺度/形状、冷却、检查间隔；预览 prompt、立即触发 |
 | 会话 | 预览开机包、新建今日会话、按日期整理、让会话退役 |
+| 组件 | 已登记组件的状态 / 版本 / 能力 / 启动错误（只读，启停归 DSH 加载流程） |
 | 自检 | 环境检查清单 + 一键初始化结果 |
 
 配置写入 `<数据根>/config.json`。**保存后能立即生效的只有 `idleClock`**（它有自己的 configure），其余字段由各服务启动时快照，需要重启插件；保存结果的提示里会分开写明。
@@ -73,6 +74,9 @@ GET  /dsh-onefish-core/api/config        # 当前配置 + 默认值 + liveKeys
 POST /dsh-onefish-core/api/config        # { config: {...} } 归一化落盘，返回 warnings
 GET  /dsh-onefish-core/api/diagnostics   # 自检清单
 POST /dsh-onefish-core/api/bootstrap     # 一键初始化
+GET  /dsh-onefish-core/api/characters    # 角色列表 + 当前角色
+POST /dsh-onefish-core/api/characters    # { id, name } 新建角色（空壳人格）
+POST /dsh-onefish-core/api/characters/switch  # { id } 只改当前角色
 ```
 
 写接口都要求本机回环 Host、同源 Origin、`application/json`。

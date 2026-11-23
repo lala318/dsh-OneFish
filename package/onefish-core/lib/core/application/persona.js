@@ -87,6 +87,23 @@ export function createPersonaService({ store, logger = () => {} } = {}) {
     return get();
   }
 
+  /** 切到另一个角色：只改「当前角色」，不碰任何人格正文。 */
+  function switchTo(id) {
+    const clean = String(id || '').trim();
+    if (!clean) throw new Error('要切到哪个角色？');
+    if (!store.getCharacter(clean)) throw new Error(`没有角色 ${clean}`);
+    store.setCurrent(clean);
+    logger(`已切换角色：${clean}`);
+    return get();
+  }
+
+  /** 新建角色（含一个空人格卡），不自动切换。 */
+  function create({ id, name = '', text = '' } = {}) {
+    const created = store.createCharacter({ id, name, text });
+    logger(`已新建角色：${created}`);
+    return { id: created, name: String(name || created) };
+  }
+
   function block({ maxChars = MAX_PROMPT_CHARS } = {}) {
     const persona = get();
     const text = String(persona.text || '').trim();
@@ -107,5 +124,5 @@ export function createPersonaService({ store, logger = () => {} } = {}) {
     };
   }
 
-  return { current, get, list, update, block, health };
+  return { current, get, list, update, switchTo, create, block, health };
 }

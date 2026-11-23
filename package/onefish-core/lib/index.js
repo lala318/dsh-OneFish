@@ -543,6 +543,31 @@ export function apply(ctx) {
         return;
       }
     }
+    if (pathname === `${API_PREFIX}/characters` && req.method === 'GET') {
+      const current = core.persona.current();
+      json(res, 200, { ok: true, current: current?.id || '', name: current?.name || '', items: core.persona.list() });
+      return;
+    }
+    if (pathname === `${API_PREFIX}/characters` && req.method === 'POST') {
+      const body = await readBody(req);
+      try {
+        const created = core.persona.create({ id: body?.id, name: body?.name });
+        json(res, 200, { ok: true, created });
+      } catch (error) {
+        json(res, 400, { ok: false, error: String(error?.message ?? error) });
+      }
+      return;
+    }
+    if (pathname === `${API_PREFIX}/characters/switch` && req.method === 'POST') {
+      const body = await readBody(req);
+      try {
+        const persona = core.persona.switchTo(body?.id);
+        json(res, 200, { ok: true, ...persona });
+      } catch (error) {
+        json(res, 400, { ok: false, error: String(error?.message ?? error) });
+      }
+      return;
+    }
     if (pathname === `${API_PREFIX}/memory` && req.method === 'GET') {
       const tier = String(url.searchParams.get('tier') ?? '');
       const q = String(url.searchParams.get('q') ?? '');

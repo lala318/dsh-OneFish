@@ -177,6 +177,30 @@ try {
     assert.ok(session.hint, '失败项要给下一步提示');
   });
 
+  await test('角色：新建 → 切换 → 人格正文跟着换，重复/非法直接拒绝', async () => {
+    const created = await call(api, { method: 'POST', url: `${API}/characters`, body: { id: 'char-a', name: '角色A' } });
+    assert.equal(created.statusCode, 200);
+    assert.equal(created.json.created.id, 'char-a');
+
+    const list = await call(api, { url: `${API}/characters` });
+    assert.ok(list.json.items.some((item) => item.id === 'char-a'), '列表里应出现新角色');
+
+    const switched = await call(api, { method: 'POST', url: `${API}/characters/switch`, body: { id: 'char-a' } });
+    assert.equal(switched.statusCode, 200);
+    const persona = await call(api, { url: `${API}/persona` });
+    assert.match(persona.json.text, /还没写/, '切过去后拿到的应是新角色的空壳人格');
+
+    const duplicate = await call(api, { method: 'POST', url: `${API}/characters`, body: { id: 'char-a' } });
+    assert.equal(duplicate.statusCode, 400);
+
+    const missing = await call(api, { method: 'POST', url: `${API}/characters/switch`, body: { id: 'nope' } });
+    assert.equal(missing.statusCode, 400);
+    assert.match(missing.json.error, /没有角色/);
+
+    const badId = await call(api, { method: 'POST', url: `${API}/characters`, body: { id: '../evil' } });
+    assert.equal(badId.statusCode, 400, '路径穿越形态的 id 必须被拒');
+  });
+
   await test('非回环 Host 直接 403', async () => {
     const res = await call(api, { url: `${API}/config`, headers: { host: 'evil.example.com' } });
     assert.equal(res.statusCode, 403);
