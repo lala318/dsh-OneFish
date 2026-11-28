@@ -116,9 +116,14 @@ export function createArchiveService({ paths, logger = () => {} }) {
     return path.join(paths.archiveDigestsDir, `${day}.summary.md`);
   }
 
-  /** 模型压缩出来的当日要点；第一行记下源哈希，方便判断要不要重做。 */
+  function summaryErrorFile(day) {
+    return path.join(paths.archiveDigestsDir, `${day}.summary.error.md`);
+  }
+
+  /** 模型压缩出来的当日要点；第一行记下源哈希，方便判断要不要重做。成功写入时清掉旧的失败记录。 */
   function writeSummary(day, { text = '', sourceHash: hash = '' } = {}) {
     writeAtomic(summaryFile(day), `<!-- source:${hash} -->\n${String(text).trim()}\n`);
+    try { fs.rmSync(summaryErrorFile(day), { force: true }); } catch {}
   }
 
   function readSummary(day) {
@@ -128,6 +133,23 @@ export function createArchiveService({ paths, logger = () => {} }) {
     const body = (match ? raw.slice(match[0].length) : raw).trim();
     if (!body) return null;
     return { text: body, sourceHash: match ? match[1] : '' };
+  }
+
+  /** 压缩失败时记一笔原因，设置页要看得见。 */
+  function writeSummaryError(day, message = '') {
+    writeAtomic(summaryErrorFile(day), `${new Date().toISOString()}\n${String(message).slice(0, 500)}\n`);
+  }
+
+  /** 当日压缩稿状态：done（有压缩稿）/ failed（最近一次失败）/ none（还没有）。 */
+  function summaryStatus(day) {
+    const summary = readSummary(day);
+    if (summary) return { status: 'done', chars: summary.text.length, sourceHash: summary.sourceHash };
+    const raw = readText(summaryErrorFile(day)).trim();
+    if (raw) {
+      const [at = '', ...rest] = raw.split(/\r?\n/);
+      return { status: 'failed', error: rest.join(' ').trim(), at };
+    }
+    return { status: 'none' };
   }
 
   /** 读取某天已归档的原始记录；供模型夜间整理使用。 */
@@ -188,5 +210,5 @@ export function createArchiveService({ paths, logger = () => {} }) {
     return out;
   }
 
-  return { consolidateDay, readDigest, readDay, readSummary, writeSummary, listDays, search };
+  return { consolidateDay, readDigest, readDay, readSummary, writeSummary, writeSummaryError, summaryStatus, listDays, search };
 }

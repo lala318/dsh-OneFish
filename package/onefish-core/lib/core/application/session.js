@@ -580,7 +580,9 @@ export function createSessionService({
             if (text) archive.writeSummary(day, { text, sourceHash: result.sourceHash });
           }
         } catch (error) {
-          logger(`日摘要压缩失败 ${day}：${error?.message ?? error}`);
+          const message = String(error?.message ?? error);
+          logger(`日摘要压缩失败 ${day}：${message}`);
+          archive.writeSummaryError?.(day, message);
         }
       }
       logger(`日终整理完成：${day}（${result.count} 条消息）`);

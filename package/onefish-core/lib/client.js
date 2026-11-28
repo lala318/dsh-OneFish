@@ -142,6 +142,7 @@ window.__ModuleLoader__.load({
 
       const [sessions, setSessions] = useState(null);
       const [bootPreview, setBootPreview] = useState("");
+      const [bootYesterday, setBootYesterday] = useState(null);
       const [consolidateDay, setConsolidateDay] = useState("");
       const [bootstrapActions, setBootstrapActions] = useState([]);
 
@@ -377,11 +378,31 @@ window.__ModuleLoader__.load({
       }
 
       // ── 会话 ────────────────────────────────────────────────────
+      function yesterdaySummaryLabel(y) {
+        if (!y) return "—";
+        const s = y.summary || {};
+        if (s.status === "done") return `${y.yesterday} 压缩稿已生成（${s.chars} 字）`;
+        if (s.status === "failed") return `${y.yesterday} 压缩失败：${s.error || "原因未知"}`;
+        return `${y.yesterday} 压缩稿未生成`;
+      }
+
+      function yesterdaySourceLabel(y) {
+        if (!y) return "";
+        const map = {
+          summary: "昨天这段来自压缩稿",
+          distill: "压缩稿没有，昨天这段是规则提炼的兜底",
+          digest: "压缩稿和档案都没有，昨天这段是日摘要原文",
+          none: "昨天没有可用内容",
+        };
+        return `${y.yesterday}：${map[y.source] || "未知来源"}`;
+      }
+
       async function loadBootPreview() {
         setBusy("bootpack"); clearFlash();
         try {
           const data = await api("/session/bootpack");
           setBootPreview(String(data.text || ""));
+          setBootYesterday(data.yesterday || null);
           flash(`开机包 ${data.chars || 0} 字`);
         } catch (e) {
           setError(String(e?.message || e));
@@ -714,6 +735,7 @@ window.__ModuleLoader__.load({
             h(Row, { name: "工作区", value: stats.workspaceTitle }),
             h(Row, { name: "当前会话", value: sessions.active ? `${sessions.active.sessionId}` : "还没有" }),
             h(Row, { name: "开机包", value: sessions.active?.bootPackAt ? "已注入" : "未注入" }),
+            h(Row, { name: "昨天压缩稿", value: yesterdaySummaryLabel(sessions.bootYesterday) }),
             h(Row, { name: "待整理", value: stats.pending ?? 0 })),
           h("div", { style: C.paste },
             h("button", { style: C.btn2, disabled: busy === "bootpack", onClick: loadBootPreview }, busy === "bootpack" ? "读取中…" : "预览开机包"),
@@ -721,7 +743,9 @@ window.__ModuleLoader__.load({
             h("input", { style: { ...C.input, width: "150px" }, placeholder: "YYYY-MM-DD", value: consolidateDay, onChange: (e) => setConsolidateDay(e.target.value) }),
             h("button", { style: C.btn2, disabled: busy === "session-consolidate", onClick: consolidate }, "整理指定日期")),
           bootPreview
-            ? h("pre", { style: { ...C.card, whiteSpace: "pre-wrap", wordBreak: "break-word", maxHeight: "360px", overflow: "auto", marginTop: "10px", fontSize: "12px", lineHeight: "18px" } }, bootPreview)
+            ? h("div", { style: { marginTop: "10px" } },
+              bootYesterday ? h("div", { style: { ...C.hint, marginBottom: "6px" } }, yesterdaySourceLabel(bootYesterday)) : null,
+              h("pre", { style: { ...C.card, whiteSpace: "pre-wrap", wordBreak: "break-word", maxHeight: "360px", overflow: "auto", fontSize: "12px", lineHeight: "18px" } }, bootPreview))
             : h("div", { style: { ...C.hint, marginTop: "8px" } }, "开机包是每轮注入的开场上下文，看一眼就知道模型开局拿到什么。"),
           h("div", { style: { ...C.label, margin: "12px 0 6px" } }, "最近的日会话"),
           rows.length === 0

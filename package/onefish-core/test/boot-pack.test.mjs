@@ -67,6 +67,17 @@ try {
   assert.match(summaryText, /【昨天 2026-11-14】\n- 主人决定周五前修完召回门槛/);
   assert.doesNotMatch(summaryText, /共 62 条消息/, '有压缩稿时不该再用规则挑重点');
   assert.equal(core.archive.readSummary('2026-11-30'), null);
+  // 设置页要看的状态：有压缩稿 → source=summary；压缩失败 → 带原因；成功后失败记录被清掉
+  assert.deepEqual(core.bootPack.describe({ day: '2026-11-15' }).source, 'summary');
+  assert.equal(core.bootPack.describe({ day: '2026-11-15' }).summary.status, 'done');
+  core.archive.writeSummaryError('2026-11-19', 'model timeout');
+  const failed = core.bootPack.describe({ day: '2026-11-20' });
+  assert.equal(failed.summary.status, 'failed');
+  assert.equal(failed.summary.error, 'model timeout');
+  assert.notEqual(failed.source, 'summary');
+  core.archive.writeSummary('2026-11-19', { text: '- 补上了', sourceHash: 'def' });
+  assert.equal(core.archive.summaryStatus('2026-11-19').status, 'done');
+  assert.equal(core.bootPack.describe({ day: '2026-11-30' }).summary.status, 'none');
 
   console.log('✅ 开机包测试通过');
 } finally {

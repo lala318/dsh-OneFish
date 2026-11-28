@@ -70,15 +70,18 @@ export function distillDay(messages = [], { maxChars = 1200, skipPrefixes = [] }
 export function createBootPackService({ persona, memory, archive, config = DEFAULT_CONFIG, now = () => Date.now() } = {}) {
   const options = { ...DEFAULT_CONFIG, ...config };
 
-  /** 昨天的内容：优先从全量档案里提炼重点；没有档案时才退回日摘要原文。 */
-  function yesterdayBody(yesterday) {
+  /**
+   * 昨天的内容：优先用模型压缩稿；没有就从全量档案里规则提炼；都没有才退回日摘要原文。
+   * 返回 { text, source }，source 为 summary | distill | digest | none。
+   */
+  function yesterdaySection(yesterday) {
     let summary = null;
     try {
       summary = typeof archive?.readSummary === 'function' ? archive.readSummary(yesterday) : null;
     } catch {
       summary = null;
     }
-    if (summary?.text) return truncate(summary.text, options.digestMaxChars);
+    if (summary?.text) return { text: truncate(summary.text, options.digestMaxChars), source: 'summary' };
     let messages = [];
     try {
       messages = typeof archive?.readDay === 'function' ? archive.readDay(yesterday) : [];
@@ -89,9 +92,22 @@ export function createBootPackService({ persona, memory, archive, config = DEFAU
       maxChars: options.digestMaxChars,
       skipPrefixes: options.recall?.skipPrefixes || [],
     });
-    if (distilled) return distilled;
+    if (distilled) return { text: distilled, source: 'distill' };
     const digest = archive?.readDigest?.(yesterday);
-    return digest ? truncate(digest, options.digestMaxChars) : '';
+    if (digest) return { text: truncate(digest, options.digestMaxChars), source: 'digest' };
+    return { text: '', source: 'none' };
+  }
+
+  /** 设置页用：昨天这段来自哪里、压缩稿是什么状态。只读，不拼整份开机包。 */
+  function describe({ day } = {}) {
+    const currentDay = String(day || '').trim();
+    if (!currentDay) return null;
+    const yesterday = shiftDay(currentDay, -1);
+    const section = yesterdaySection(yesterday);
+    const summary = typeof archive?.summaryStatus === 'function'
+      ? archive.summaryStatus(yesterday)
+      : { status: 'none' };
+    return { yesterday, source: section.source, chars: section.text.length, summary };
   }
 
   function build({ day, workspace = null } = {}) {
@@ -113,7 +129,7 @@ export function createBootPackService({ persona, memory, archive, config = DEFAU
     if (memoryBlocks.active) blocks.push(memoryBlocks.active);
 
     const yesterday = shiftDay(currentDay, -1);
-    const yesterdayText = yesterdayBody(yesterday);
+    const yesterdayText = yesterdaySection(yesterday).text;
     if (yesterdayText) {
       blocks.push(`【昨天 ${yesterday}】\n${yesterdayText}`);
     }
@@ -140,5 +156,5 @@ export function createBootPackService({ persona, memory, archive, config = DEFAU
     return out;
   }
 
-  return { build };
+  return { build, describe };
 }

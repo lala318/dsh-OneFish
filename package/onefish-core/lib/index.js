@@ -616,12 +616,13 @@ export function apply(ctx) {
       const active = core.session.current();
       if (!active) { json(res, 404, { ok: false, error: '今天还没有日会话' }); return; }
       const text = core.bootPack.build({ day: active.day, workspace: active });
-      json(res, 200, { ok: true, day: active.day, sessionId: active.sessionId, workspaceTitle: active.workspaceTitle, injectedAt: active.bootPackAt, chars: text.length, text });
+      json(res, 200, { ok: true, day: active.day, sessionId: active.sessionId, workspaceTitle: active.workspaceTitle, injectedAt: active.bootPackAt, chars: text.length, text, yesterday: core.bootPack.describe({ day: active.day }) });
       return;
     }
     if (pathname === `${API_PREFIX}/sessions` && req.method === 'GET') {
       const status = core.session.status();
-      json(res, 200, { ok: true, ...status, current: status.active });
+      const bootYesterday = core.bootPack.describe({ day: status.stats?.currentDay || status.active?.day || '' });
+      json(res, 200, { ok: true, ...status, current: status.active, bootYesterday });
       return;
     }
     if (pathname === `${API_PREFIX}/idle/status` && req.method === 'GET') {
