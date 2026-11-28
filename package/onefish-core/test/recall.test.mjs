@@ -84,6 +84,9 @@ test('召回服务：命中注入、短消息/空闲前缀不注入', async () =
   assert.ok(!ok.text.includes('西红柿炒鸡蛋'), '无关记忆不该被召回');
 
   assert.equal((await core.recall.build({ text: '嗯' })).reason, 'short');
+  const brief = await core.recall.build({ text: '考研数一' });
+  assert.equal(brief.reason, 'ok', '4 字短消息也应能触发召回');
+  assert.match(brief.text, /考研/);
   assert.match((await core.recall.build({ text: '【空闲】现在是 2026-11-19 22:50' })).reason, /^prefix:/);
 });
 

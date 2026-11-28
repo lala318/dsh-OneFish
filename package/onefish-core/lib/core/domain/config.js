@@ -28,7 +28,7 @@ export const DEFAULT_CONFIG = Object.freeze({
     lexicalMinScore: 0.35,
     timeoutMs: 600,
     maxChars: 600,
-    minQueryChars: 6,
+    minQueryChars: 2,
     maxQueryChars: 800,
     skipPrefixes: ['【空闲】', '【开机包】', '【记忆召回】'],
     skipFirstTurn: true,

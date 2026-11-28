@@ -82,6 +82,7 @@ export function apply(ctx) {
     logger: (...args) => console.log('[onefish-core]', ...args),
     sessionAdapter,
     memoryConsolidator,
+    memoryComplete: memoryCompletion ? memoryCompletion.complete : null,
     idlePrompt: ctx.sessionController
       ? async ({ sessionId, text }) => {
         const controller = createBrokerSessionController(ctx.sessionController);

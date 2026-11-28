@@ -19,6 +19,7 @@ import { createSessionIndexStore } from './adapters/fs/session-index.js';
 import { createPersonaService } from './application/persona.js';
 import { createMemoryService } from './application/memory.js';
 import { createSessionService } from './application/session.js';
+import { createDaySummarizer } from './application/day-summary.js';
 import { createArchiveService } from './adapters/fs/archive.js';
 import { createComponentStore } from './adapters/fs/component-store.js';
 import { createIdleStore } from './adapters/fs/idle-store.js';
@@ -38,6 +39,7 @@ export function createCore({
   config: configOverride = {},
   idlePrompt = null,
   memoryConsolidator = null,
+  memoryComplete = null,
 } = {}) {
   const paths = createCorePaths({ home, repoRoot });
   ensureCoreDirs(paths);
@@ -82,6 +84,9 @@ export function createCore({
     recall,
     memoryMaintenance: ({ day }) => memory.maintain({ day }),
     memoryConsolidator,
+    daySummarizer: typeof memoryComplete === 'function'
+      ? createDaySummarizer({ complete: memoryComplete, maxChars: config.digestMaxChars, logger })
+      : null,
     config,
     logger,
     now,

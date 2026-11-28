@@ -112,6 +112,24 @@ export function createArchiveService({ paths, logger = () => {} }) {
     }
   }
 
+  function summaryFile(day) {
+    return path.join(paths.archiveDigestsDir, `${day}.summary.md`);
+  }
+
+  /** 模型压缩出来的当日要点；第一行记下源哈希，方便判断要不要重做。 */
+  function writeSummary(day, { text = '', sourceHash: hash = '' } = {}) {
+    writeAtomic(summaryFile(day), `<!-- source:${hash} -->\n${String(text).trim()}\n`);
+  }
+
+  function readSummary(day) {
+    const raw = readText(summaryFile(day));
+    if (!raw.trim()) return null;
+    const match = raw.match(/^<!-- source:(\S*) -->\r?\n?/);
+    const body = (match ? raw.slice(match[0].length) : raw).trim();
+    if (!body) return null;
+    return { text: body, sourceHash: match ? match[1] : '' };
+  }
+
   /** 读取某天已归档的原始记录；供模型夜间整理使用。 */
   function readDay(day) {
     return readText(dayFile(day)).split(/\r?\n/).filter(Boolean).flatMap((line) => {
@@ -170,5 +188,5 @@ export function createArchiveService({ paths, logger = () => {} }) {
     return out;
   }
 
-  return { consolidateDay, readDigest, readDay, listDays, search };
+  return { consolidateDay, readDigest, readDay, readSummary, writeSummary, listDays, search };
 }

@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createCore } from '../lib/core/index.js';
+import { distillDay } from '../lib/core/application/boot-pack.js';
 
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'onefish-boot-pack-test-'));
 try {
@@ -43,6 +44,29 @@ try {
   assert.ok(text.length >= 200);
   assert.match(text, /消息可能来自 DSH 原生对话窗口或频道组件/);
   assert.match(text, /使用当前可用的频道发送工具/);
+
+  // 昨天很长：大量寒暄 + 一句靠后的要紧话，开机包应挑出要紧话，而不是只取开头。
+  const busy = [];
+  for (let i = 0; i < 60; i += 1) {
+    busy.push({ event: { type: 'user/message', seq: 10 + i, data: { role: 'user', content: i % 2 ? '哈哈哈哈哈哈哈' : `闲聊第 ${i} 句，随便说点别的事情吧` } } });
+  }
+  busy.push({ event: { type: 'user/message', seq: 100, data: { role: 'user', content: '我决定了，下周五前把召回门槛那个问题修完并提交' } } });
+  busy.push({ event: { type: 'assistant/message', seq: 101, data: { message: { role: 'assistant', content: '记下了，周五前我会提醒你。' } } } });
+  core.archive.consolidateDay({ day: '2026-11-14', sessionId: 'session-busy', records: busy });
+  const busyText = core.bootPack.build({ day: '2026-11-15' });
+  assert.match(busyText, /【昨天 2026-11-14】/);
+  assert.match(busyText, /我决定了，下周五前把召回门槛/);
+  assert.match(busyText, /共 62 条消息/);
+  assert.doesNotMatch(busyText, /哈哈哈哈哈哈哈/, '寒暄不该占开机包');
+  assert.equal(distillDay([{ role: 'user', text: '嗯' }, { role: 'user', text: '好的' }]), '');
+
+  // 有压缩稿时，开机包用压缩稿，不再挑原文。
+  core.archive.writeSummary('2026-11-14', { text: '- 主人决定周五前修完召回门槛\n- 助手答应周五前提醒进度', sourceHash: 'abc' });
+  assert.deepEqual(core.archive.readSummary('2026-11-14'), { text: '- 主人决定周五前修完召回门槛\n- 助手答应周五前提醒进度', sourceHash: 'abc' });
+  const summaryText = core.bootPack.build({ day: '2026-11-15' });
+  assert.match(summaryText, /【昨天 2026-11-14】\n- 主人决定周五前修完召回门槛/);
+  assert.doesNotMatch(summaryText, /共 62 条消息/, '有压缩稿时不该再用规则挑重点');
+  assert.equal(core.archive.readSummary('2026-11-30'), null);
 
   console.log('✅ 开机包测试通过');
 } finally {

@@ -57,11 +57,13 @@ try {
   assert.equal(dayStart('2026-11-13'), new Date(2026, 10, 13, 4, 0, 0, 0).getTime());
 
   const consolidatedCalls = [];
+  const summaryPrompts = [];
   const core = createCore({
     home: temp,
     repoRoot: path.resolve(import.meta.dirname, '../..'),
     sessionAdapter: adapter,
     memoryConsolidator: async ({ day, digest }) => { consolidatedCalls.push({ day, digest }); },
+    memoryComplete: async (prompt) => { summaryPrompts.push(prompt); return '- 今天聊了日会话'; },
     now: () => now,
     config: { autoConsolidate: false, consolidateOnBootstrap: false, rolloverHour: 4, workspacePath: temp, workspaceTitle: 'onefish' },
   });
@@ -170,11 +172,15 @@ try {
   assert.equal(consolidatedCalls[0].day, '2026-11-13');
   assert.match(consolidatedCalls[0].digest, /今天聊了日会话/);
   assert.deepEqual(core.archive.listDays(), ['2026-11-13']);
+  // 日终压缩：生成当日要点并落盘，开机包会优先读它
+  assert.equal(summaryPrompts.length, 1);
+  assert.equal(core.archive.readSummary('2026-11-13').text, '- 今天聊了日会话');
 
-  // 幂等：不重复读历史
+  // 幂等：不重复读历史，也不重复压缩
   const again = await core.session.consolidateDay('2026-11-13');
   assert.equal(again.skipped, true);
   assert.equal(adapter.historyCalls, 1);
+  assert.equal(summaryPrompts.length, 1);
 
   // 回收：归档当前会话，状态转 retired
   const retired = await core.session.retire('session-test-2');

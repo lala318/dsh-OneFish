@@ -12,6 +12,7 @@ import { dayKeyOf, normalizeDayKey } from '../domain/day.js';
 import { DEFAULT_CONFIG } from '../domain/config.js';
 import { timestampText } from '../domain/timestamp.js';
 import { userMessageText } from './recall.js';
+import { normalizeRecords } from '../domain/consolidation.js';
 
 function safeLimit(value, fallback = 20, max = 100) {
   const n = Number(value);
@@ -27,6 +28,7 @@ export function createSessionService({
   recall = null,
   memoryMaintenance = null,
   memoryConsolidator = null,
+  daySummarizer = null,
   config = DEFAULT_CONFIG,
   logger = () => {},
   now = () => Date.now(),
@@ -563,6 +565,22 @@ export function createSessionService({
           await memoryConsolidator({ day, digest, events, sessionId: entry.sessionId });
         } catch (error) {
           logger(`模型记忆提炼失败 ${day}：${error?.message ?? error}`);
+        }
+      }
+      if (daySummarizer && archive && result.count > 0) {
+        try {
+          const existing = archive.readSummary?.(day);
+          if (force || !existing || existing.sourceHash !== result.sourceHash) {
+            const messages = normalizeRecords(records);
+            const text = await daySummarizer.summarize({
+              day,
+              messages,
+              skipPrefixes: options.recall?.skipPrefixes || [],
+            });
+            if (text) archive.writeSummary(day, { text, sourceHash: result.sourceHash });
+          }
+        } catch (error) {
+          logger(`日摘要压缩失败 ${day}：${error?.message ?? error}`);
         }
       }
       logger(`日终整理完成：${day}（${result.count} 条消息）`);
